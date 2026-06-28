@@ -252,7 +252,7 @@ render() {
                         const poly = pts.map(p =>
                             `${(((p.x - minX) / bw) * 100).toFixed(2)}% ${(((p.y - minY) / bh) * 100).toFixed(2)}%`
                         ).join(', ');
-                        const warpStyle = `position: absolute; left: ${left}%; top: ${top}%; width: ${w}%; height: ${h}%; background-color: ${bgcolor}; clip-path: polygon(${poly}); ${shadowStyle}`;
+                        const warpStyle = `position: absolute; left: ${leftPc}%; top: ${topPc}%; width: ${wPc}%; height: ${hPc}%; background-color: ${bgcolor}; clip-path: polygon(${poly}); ${shadowStyle}`;
                         out += `${indent}<div id="${id}" class="${animClass}" style="${warpStyle}"></div>\n`;
                     } else {
                         out += `${indent}<div id="${id}" class="${animClass}" style="${baseStyle}"></div>\n`;

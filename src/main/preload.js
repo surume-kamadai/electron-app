@@ -15,4 +15,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Scene(JSON) の保存・読込
     saveScene: (jsonStr) => ipcRenderer.invoke('save-scene', jsonStr),
     loadScene: () => ipcRenderer.invoke('load-scene'),
+
+    // ネイティブメニュー（ファイル/編集）からのアクションを受け取る
+    onMenuAction: (callback) =>
+        ipcRenderer.on('menu-action', (event, action) => callback(action)),
+
+    // 「表示」メニューのパネル開閉トグルを受け取る
+    onTogglePanel: (callback) =>
+        ipcRenderer.on('toggle-panel', (event, payload) => callback(payload)),
+
+    // レンダラー側でパネルの開閉状態が変わったらメニューのチェックを同期させる
+    notifyPanelState: (id, open) =>
+        ipcRenderer.send('panel-state-changed', { id, open }),
 });

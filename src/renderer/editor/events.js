@@ -499,22 +499,24 @@ document.getElementById('workspace').addEventListener('drop', async e => {
         let h = img.height;
         if (w > 300) { h = h * (300 / w); w = 300; }
 
-        const count   = incrementElementCount();
-        const newNode = new Konva.Image({
-            x: x > 0 ? x : 50, y: y > 0 ? y : 50,
-            width: w, height: h,
-            image: img, draggable: true, name: 'ui-element', id: 'image_' + count,
-        });
-        newNode.setAttr('uiType', 'Image');
-        newNode.setAttr('bladeData', {
-            name: '画像 ' + count, text: imageUrl,
-            bgcolor: '#ffffff', color: '#000000', fontsize: 16,
-            route: '#', method: 'POST', event: 'none',
-        });
-        newNode.on('dragend transformend', () => {
-            updateInspectorFromNode(); renderExplorer(); saveHistory();
-        });
-        layer.add(newNode);
+        // spawnElement('Image', loadData) を再利用し、ツールボタン経由と同一の
+        // bladeData 構造（_pcGeom / layouts / events 等を含む）で生成する。
+        // これでレスポンシブ出力やシリアライズの不整合を防ぐ。
+        const count = incrementElementCount();
+        const loadData = {
+            id: 'image_' + count,
+            transform: { x: x > 0 ? x : 50, y: y > 0 ? y : 50, width: w, height: h },
+            properties: {
+                name: '画像 ' + count, text: imageUrl,
+                bgcolor: '#ffffff', color: '#000000', fontsize: 16,
+                align: 'left', fontfamily: 'sans-serif', lock: false,
+                route: '#', method: 'POST', event: 'none',
+                shadow: 'none', animation: 'none', bgimage: '',
+                layouts: {}, mobileEdited: false, visible: true, events: [],
+            },
+        };
+        // loadData 指定時は spawnElement が自動選択/履歴保存をしないので、後で明示的に行う
+        const newNode = spawnElement('Image', loadData, layer, false, true);
         applySelectedNodes([newNode]);
         saveHistory();
         showToast('画像を追加しました。');

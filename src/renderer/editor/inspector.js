@@ -60,8 +60,6 @@ export function updateInspectorFromNode() {
     } else {
         document.getElementById('group-text-align').style.display = 'none';
     }
-    const hoverAction = document.getElementById('ins-hover-action');
-    if (hoverAction) hoverAction.value = bData.hoverAction || 'none';
     // ボタンの時だけ背景画像UIを表示
     const groupBgImage = document.getElementById('group-btn-bgimage');
     if (groupBgImage) {
@@ -154,8 +152,6 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
     bData.bgcolor  = document.getElementById('ins-bgcolor').value;
     bData.color    = document.getElementById('ins-color').value;
 
-    const hoverAction = document.getElementById('ins-hover-action');
-    if (hoverAction) bData.hoverAction = hoverAction.value;
     const newFontsize = parseInt(document.getElementById('ins-fontsize').value) || 16;
     // フォントサイズはデバイスごとに分離: PCはbData.fontsize、スマホは layouts.mobile.fontsize
     if (currentDevice === 'mobile') {
@@ -786,8 +782,6 @@ function getTargetOptions(currentId) {
 // イベントリストの再描画
 export function renderEventList(node) {
     const listEl = document.getElementById('ins-events-list');
-    const hoverAction = document.getElementById('ins-hover-action');
-    if (hoverAction) hoverAction.value = bData.hoverAction || 'none';
     if (!listEl) return;
     listEl.innerHTML = '';
 
