@@ -69,6 +69,46 @@ export function syncBgColorUI() {
     if (pageEl) pageEl.value = (page && page.bgColor) ? page.bgColor : (s.siteBgColor || '#f1f2f6');
     applyCanvasBgPreview();
     refreshPageBgStatus();
+    syncSeoUI();
+}
+
+// ============================================================
+// SEO設定（サイト共通 / ページ個別）
+// ============================================================
+
+// サイト共通SEOの更新
+export function updateSiteSeo() {
+    const s = getSettings();
+    if (!s.seo) s.seo = { siteName: '', lang: 'ja', description: '', ogImage: '' };
+    s.seo.siteName    = document.getElementById('seo-site-name')?.value ?? '';
+    s.seo.lang        = (document.getElementById('seo-lang')?.value || 'ja').trim();
+    s.seo.ogImage     = document.getElementById('seo-og-image')?.value ?? '';
+    s.seo.description = document.getElementById('seo-description')?.value ?? '';
+}
+
+// このページ個別SEOの更新
+export function updatePageSeo() {
+    const page = getActivePage();
+    if (!page) return;
+    if (!page.seo) page.seo = { title: '', description: '', ogImage: '' };
+    page.seo.title       = document.getElementById('seo-page-title')?.value ?? '';
+    page.seo.description = document.getElementById('seo-page-description')?.value ?? '';
+    page.seo.ogImage     = document.getElementById('seo-page-og-image')?.value ?? '';
+}
+
+// SEOフィールドを現在の設定/ページに合わせて表示更新
+export function syncSeoUI() {
+    const seo  = getSettings().seo || {};
+    const page = getActivePage();
+    const pseo = (page && page.seo) || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+    set('seo-site-name',         seo.siteName);
+    set('seo-lang',              seo.lang || 'ja');
+    set('seo-og-image',          seo.ogImage);
+    set('seo-description',       seo.description);
+    set('seo-page-title',        pseo.title);
+    set('seo-page-description',  pseo.description);
+    set('seo-page-og-image',     pseo.ogImage);
 }
 
 // プロジェクト名の変更

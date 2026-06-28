@@ -126,6 +126,39 @@
                 </div>
                 <div id="page-bg-status" style="font-size:10px; color:#888; margin-bottom:6px;"></div>
                 <hr style="border-color:#444; margin:10px 0;">
+                <div style="font-size:11px; color:#aaa; margin-bottom:4px; font-weight:bold;">🔍 SEO（検索・SNS表示）</div>
+                <div class="form-group">
+                    <label>サイト名（共通・タイトル末尾に付与）</label>
+                    <input type="text" id="seo-site-name" placeholder="例: 〇〇商店" onchange="updateSiteSeo()">
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>言語(lang)</label>
+                        <input type="text" id="seo-lang" value="ja" onchange="updateSiteSeo()">
+                    </div>
+                    <div class="form-group">
+                        <label>既定OG画像URL（共通）</label>
+                        <input type="text" id="seo-og-image" placeholder="https://.../ogp.png" onchange="updateSiteSeo()">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>既定の説明文（共通・各ページ未設定時）</label>
+                    <input type="text" id="seo-description" placeholder="サイト全体の説明" onchange="updateSiteSeo()">
+                </div>
+                <div style="font-size:10px; color:#888; margin:6px 0 4px;">― このページ個別（空欄なら上の共通値を使用）―</div>
+                <div class="form-group">
+                    <label>ページタイトル</label>
+                    <input type="text" id="seo-page-title" placeholder="（空欄＝ページ名を使用）" onchange="updatePageSeo()">
+                </div>
+                <div class="form-group">
+                    <label>ページ説明文</label>
+                    <input type="text" id="seo-page-description" placeholder="このページの説明" onchange="updatePageSeo()">
+                </div>
+                <div class="form-group">
+                    <label>ページOG画像URL</label>
+                    <input type="text" id="seo-page-og-image" placeholder="https://.../page-ogp.png" onchange="updatePageSeo()">
+                </div>
+                <hr style="border-color:#444; margin:10px 0;">
                 <div style="font-size:11px; color:#aaa; margin-bottom:4px; font-weight:bold;">💻 PC サイズ</div>
                 <div class="row">
                     <div class="form-group">
@@ -429,11 +462,47 @@
                         </div>
                     </div>
                     <!-- ▲ アコーディオン専用設定 ▲ -->
+
+                    <!-- ▼ ボタンの役割（リンク / フォーム送信ボタン）▼ -->
+                    <div class="form-group" id="group-btn-role" style="display:none; margin-top:10px;">
+                        <label>ボタンの役割</label>
+                        <select id="ins-btn-role" onchange="onInspectorUpdate(true)">
+                            <option value="link">リンク（ページ遷移）</option>
+                            <option value="submit">送信ボタン（フォーム送信）</option>
+                        </select>
+                    </div>
+                    <!-- ▲ ボタンの役割 ▲ -->
+
+                    <!-- ▼ 入力欄（フォーム項目）設定 ▼ -->
+                    <div id="group-input" style="display:none; margin-top:10px; border-top:1px solid #444; padding-top:10px;">
+                        <div style="font-weight:bold; font-size:11px; color:#aaa; margin-bottom:6px;">📝 入力欄（フォーム項目）</div>
+                        <div class="form-group">
+                            <label>項目名（name属性 / 送信キー）</label>
+                            <input type="text" id="ins-input-name" placeholder="例: email, name, message" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>入力タイプ</label>
+                                <select id="ins-input-type" onchange="onInspectorUpdate(true)">
+                                    <option value="text">テキスト</option>
+                                    <option value="email">メール</option>
+                                    <option value="tel">電話番号</option>
+                                    <option value="number">数値</option>
+                                    <option value="textarea">複数行（テキストエリア）</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" id="ins-input-required" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 必須</label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- ▲ 入力欄（フォーム項目）設定 ▲ -->
+
                     <hr style="border-color:#444; margin:10px 0;">
                     <div class="form-group" id="group-backend">
-                        <label>リンク先URL（Googleフォーム等）</label>
+                        <label id="ins-route-label">リンク先URL（Googleフォーム等）</label>
                         <input type="text" id="ins-route" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)" placeholder="https://forms.gle/...">
-                        <label style="margin-top:5px;">送信メソッド（Laravel出力時）</label>
+                        <label style="margin-top:5px;">送信メソッド（送信ボタン / Laravel出力時）</label>
                         <select id="ins-method" onchange="onInspectorUpdate(true)">
                             <option value="POST">POST</option>
                             <option value="GET">GET</option>

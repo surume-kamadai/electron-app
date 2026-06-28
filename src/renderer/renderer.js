@@ -61,16 +61,33 @@ render() {
         );
 
         const cssString = this.dynamicCss.join('\n    ');
-        
+
         let jsString = '';
         if (this.dynamicJs.length > 0) {
             jsString = `\n<script>\ndocument.addEventListener("DOMContentLoaded", function() {\n    ${this.dynamicJs.join('\n    ')}\n});\n</script>\n`;
         }
 
-        let html  = '<!DOCTYPE html>\n<html lang="ja">\n<head>\n';
+        // ▼▼ SEO メタタグの構築 ▼▼
+        const seo   = this.scene.seo || {};
+        const lang  = escapeHtml(seo.lang || 'ja');
+        const title = escapeHtml(seo.title || 'ページ');
+
+        let html  = `<!DOCTYPE html>\n<html lang="${lang}">\n<head>\n`;
         html += '    <meta charset="UTF-8">\n';
         html += '    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
-        html += '    <title>プレビュー画面</title>\n';
+        html += `    <title>${title}</title>\n`;
+        if (seo.description) {
+            html += `    <meta name="description" content="${escapeHtml(seo.description)}">\n`;
+        }
+        // OGP / Twitter カード
+        html += '    <meta property="og:type" content="website">\n';
+        html += `    <meta property="og:title" content="${title}">\n`;
+        if (seo.description) html += `    <meta property="og:description" content="${escapeHtml(seo.description)}">\n`;
+        if (seo.ogImage)     html += `    <meta property="og:image" content="${escapeHtml(seo.ogImage)}">\n`;
+        if (seo.siteName)    html += `    <meta property="og:site_name" content="${escapeHtml(seo.siteName)}">\n`;
+        html += `    <meta name="twitter:card" content="${seo.ogImage ? 'summary_large_image' : 'summary'}">\n`;
+        // ▲▲ SEO メタタグ構築ここまで ▲▲
+
         html += '    <style>\n' + ANIM_CSS + '\n    </style>\n';
         html += '    <style id="dynamic-styles">\n    ' + cssString + '\n    </style>\n';
         
@@ -84,8 +101,29 @@ render() {
         const bgColor = this.scene.bgColor || '#f1f2f6';
         html += `</head>\n<body style="margin: 0; background-color: ${bgColor};">\n\n`;
         
+        // ▼▼ フォーム: 送信ボタンがあればページ全体を <form> でラップ ▼▼
+        const submit = this._findSubmitButton(this.scene.elements || []);
+        let formOpen = '', formClose = '';
+        if (submit) {
+            const userAction = (submit.route && submit.route !== '#') ? submit.route : '';
+            if (this.mode === 'blade') {
+                // Laravel: exporter が決めた action を優先、無ければ /contact
+                const action = escapeHtml(this.scene.formAction || userAction || '/contact');
+                formOpen  = `<form action="${action}" method="POST">\n@csrf`;
+                formClose = `</form>`;
+            } else {
+                // 静的: Googleフォーム/Formspree 等のエンドポイントへ送信
+                const action = escapeHtml(userAction || '#');
+                const method = (submit.method || 'POST').toUpperCase() === 'GET' ? 'GET' : 'POST';
+                formOpen  = `<form action="${action}" method="${method}">`;
+                formClose = `</form>`;
+            }
+        }
+
         html += `<div class="site-canvas">\n`;
+        if (formOpen)  html += formOpen + '\n';
         html += elementsHtml;
+        if (formClose) html += formClose + '\n';
         html += '\n</div>\n';
         
         // ▼▼ 追加: スライダーがあればSwiperのJS本体を読み込む ▼▼
@@ -97,6 +135,21 @@ render() {
         html += '\n</body>\n</html>';
 
         return html;
+    }
+
+    // 要素ツリーを再帰的にたどり、最初の「送信ボタン」(role==='submit')の
+    // プロパティを返す。無ければ null。
+    _findSubmitButton(elements) {
+        for (const el of (elements || [])) {
+            const p = el.properties || {};
+            if (p.visible === false) continue;
+            if (el.type === 'Button' && p.role === 'submit') return p;
+            if (Array.isArray(el.children)) {
+                const found = this._findSubmitButton(el.children);
+                if (found) return found;
+            }
+        }
+        return null;
     }
 
     renderElements(elements, parentW, parentH, depth) {
@@ -231,7 +284,7 @@ render() {
                     out += this.renderButton(id, animClass, baseStyle, bgcolor, color, text, props, shadowStyle, indent);
                     break;
                 case 'TextInput':
-                    out += this.renderTextInput(id, animClass, baseStyle, text, indent);
+                    out += this.renderTextInput(id, animClass, baseStyle, text, props, indent);
                     break;
                 case 'Label':
                     out += this.renderLabel(id, animClass, baseStyle, color, text, props, shadowStyle, indent);
@@ -299,29 +352,43 @@ render() {
         const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; ${shadowStyle}`;
         const formStyle = `margin: 0; position: absolute; width: 100%; height: 100%;`;
 
-        if (this.mode === 'static') {
-            const url = escapeHtml(props.route && props.route !== '#' ? props.route : '#');
+        // 送信ボタン: ページ全体を包む <form>（render側で出力）が送信を担うので
+        // ここでは type="submit" のボタンを置くだけ。リンクや内部フォームは付けない。
+        if (props.role === 'submit') {
             let out = `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background:none;">\n`;
-            out += `${indent}    <a href="${url}" style="${formStyle} display:block; text-decoration:none;">\n`;
-            out += `${indent}        <button type="button" style="${btnStyle}">${text}</button>\n`;
-            out += `${indent}    </a>\n`;
+            out += `${indent}    <button type="submit" style="${btnStyle} ${formStyle}">${text}</button>\n`;
             out += `${indent}</div>\n`;
             return out;
         }
 
-        const method = escapeHtml((props.method || 'POST').toUpperCase());
+        // 通常ボタン: 静的・Blade とも <a> リンクとして出力する
+        const url = escapeHtml(props.route && props.route !== '#' ? props.route : '#');
         let out = `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background:none;">\n`;
-        out += `${indent}    <form action="#" method="${method}" style="${formStyle}">\n`;
-        out += `${indent}        @csrf\n`;
-        out += `${indent}        <button type="submit" style="${btnStyle}">${text}</button>\n`;
-        out += `${indent}    </form>\n`;
+        out += `${indent}    <a href="${url}" style="${formStyle} display:block; text-decoration:none;">\n`;
+        out += `${indent}        <button type="button" style="${btnStyle}">${text}</button>\n`;
+        out += `${indent}    </a>\n`;
         out += `${indent}</div>\n`;
         return out;
     }
 
-    renderTextInput(id, animClass, baseStyle, text, indent) {
+    renderTextInput(id, animClass, baseStyle, text, props, indent) {
+        // フォーム項目として name / 種類 / 必須 を反映する
+        const name      = escapeHtml(props.inputName || '');
+        const nameAttr  = name ? ` name="${name}"` : '';
+        const required  = props.required ? ' required' : '';
+        const ph        = escapeHtml(text || '');
+        // 入力タイプは想定値のみ許可（安全側）
+        const allowed   = ['text', 'email', 'tel', 'number'];
+        const rawType   = props.inputType || 'text';
+
+        if (rawType === 'textarea') {
+            const style = baseStyle + ' padding: 10px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; width: 100%; height: 100%; resize: none; font-family: inherit;';
+            return `${indent}<div id="${id}" class="${animClass}" style="position:absolute;"><textarea${nameAttr} placeholder="${ph}"${required} style="${style}"></textarea></div>\n`;
+        }
+
+        const itype = allowed.includes(rawType) ? rawType : 'text';
         const style = baseStyle + ' padding: 10px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; width: 100%; height: 100%;';
-        return `${indent}<div id="${id}" class="${animClass}" style="position:absolute;"><input type="text" placeholder="${text}" style="${style}"></div>\n`;
+        return `${indent}<div id="${id}" class="${animClass}" style="position:absolute;"><input type="${itype}"${nameAttr} placeholder="${ph}"${required} style="${style}"></div>\n`;
     }
 
     renderLabel(id, animClass, baseStyle, color, text, props, shadowStyle, indent) {

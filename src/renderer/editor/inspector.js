@@ -131,6 +131,31 @@ export function updateInspectorFromNode() {
     document.getElementById('btn-ungroup').style.display   = (type === 'Group')  ? 'block' : 'none';
     document.getElementById('group-text').style.display    = (type === 'Image')  ? 'none'  : 'block';
 
+    // ▼ フォーム: ボタンの役割（リンク / 送信ボタン）
+    const groupBtnRole = document.getElementById('group-btn-role');
+    if (groupBtnRole) {
+        groupBtnRole.style.display = (type === 'Button') ? 'block' : 'none';
+        const roleSel = document.getElementById('ins-btn-role');
+        if (roleSel) roleSel.value = bData.role || 'link';
+    }
+    // ▼ フォーム: 入力欄（TextInput）の項目設定
+    const groupInput = document.getElementById('group-input');
+    if (groupInput) {
+        groupInput.style.display = (type === 'TextInput') ? 'block' : 'none';
+        if (type === 'TextInput') {
+            document.getElementById('ins-input-name').value       = bData.inputName || '';
+            document.getElementById('ins-input-type').value       = bData.inputType || 'text';
+            document.getElementById('ins-input-required').checked = !!bData.required;
+        }
+    }
+    // ▼ 送信ボタン時はリンク先ラベルを「送信先URL」に切り替える
+    const routeLabel = document.getElementById('ins-route-label');
+    if (routeLabel) {
+        routeLabel.innerText = (type === 'Button' && bData.role === 'submit')
+            ? '送信先URL（フォームの action）'
+            : 'リンク先URL（Googleフォーム等）';
+    }
+
     const warpBtn = document.getElementById('btn-warp');
     if (warpBtn) {
         warpBtn.style.display = ['Rect', 'Circle', 'Triangle', 'Warp'].includes(type) ? 'block' : 'none';
@@ -177,6 +202,15 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
 
     bData.shadow    = document.getElementById('ins-shadow').value;
     bData.animation = document.getElementById('ins-animation').value;
+
+    // フォーム関連の保存
+    const roleSel = document.getElementById('ins-btn-role');
+    if (roleSel && node.getAttr('uiType') === 'Button') bData.role = roleSel.value;
+    if (node.getAttr('uiType') === 'TextInput') {
+        bData.inputName = document.getElementById('ins-input-name').value;
+        bData.inputType = document.getElementById('ins-input-type').value;
+        bData.required  = document.getElementById('ins-input-required').checked;
+    }
 
     // スライダー設定の保存
     if (node.getAttr('uiType') === 'Slider') {

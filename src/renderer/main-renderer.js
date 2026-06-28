@@ -20,6 +20,7 @@ import {
     onProjectNameChange, onOutputTypeChange,
     onCanvasSizeChange, initSettingsUI,
     updateSiteBgColor, updatePageBgColor, clearPageBgColor, syncBgColorUI,
+    updateSiteSeo, updatePageSeo,
 } from './editor/settings-ui.js';
 
 // events.js は副作用としてイベントリスナーを登録する
@@ -48,6 +49,8 @@ window.updateSiteBgColor   = updateSiteBgColor;
 window.updatePageBgColor   = updatePageBgColor;
 window.clearPageBgColor    = clearPageBgColor;
 window.__syncBgColorUI     = syncBgColorUI;
+window.updateSiteSeo       = updateSiteSeo;
+window.updatePageSeo       = updatePageSeo;
 
 
 // --- ページ操作 ---
