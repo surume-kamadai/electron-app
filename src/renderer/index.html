@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Builder</title>
+    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <!-- ドッキングUI: jQuery + golden-layout v1 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/golden-layout/1.5.9/css/goldenlayout-base.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/golden-layout/1.5.9/css/goldenlayout-dark-theme.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/golden-layout/1.5.9/goldenlayout.min.js"></script>
+    <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+    <div class="workspace" id="workspace">
+        <!-- デバイス -->
+        <div style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; gap: 10px; background: #333; padding: 5px 15px; border-radius: 20px; border: 1px solid #555; box-shadow: 0 4px 10px rgba(0,0,0,0.5); align-items: center;">
+            <button id="btn-device-pc" onclick="switchDevice('pc')" style="background: none; border: none; font-size: 14px; padding: 4px 8px; opacity: 1; margin: 0; width: auto; font-weight:bold;" title="PC表示">💻 PC</button>
+            <button id="btn-device-mobile" onclick="switchDevice('mobile')" style="background: none; border: none; font-size: 14px; padding: 4px 8px; opacity: 0.4; margin: 0; width: auto; font-weight:bold;" title="スマホ表示">📱 Mobile</button>
+            <div style="width: 1px; height: 20px; background: #666; margin: 0 5px;"></div>
+            <button onclick="playPreview()" style="background: #27ae60; border: none; font-size: 14px; padding: 4px 12px; margin: 0; width: auto; font-weight:bold; border-radius: 12px; color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);" title="プレビュー再生">▶️ Play</button>
+        </div>
+        
+        <div id="preview-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="width: 100%; height: 50px; background: #1e1e1e; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 15px rgba(0,0,0,0.8); z-index: 2;">
+                <span style="color: #2ecc71; font-weight: bold; margin-right: 20px; font-size: 14px;">▶️ プレビュー実行中</span>
+                <button onclick="stopPreview()" style="background: #cc4545; border: none; padding: 8px 24px; color: white; font-weight: bold; border-radius: 20px; cursor: pointer; transition: 0.2s;">■ 編集に戻る</button>
+            </div>
+            <div style="flex: 1; width: 100%; display: flex; justify-content: center; align-items: center; padding: 30px; box-sizing: border-box; overflow: hidden;">
+                <iframe id="preview-frame" style="background: #fff; border: 1px solid #444; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); transition: width 0.3s ease, height 0.3s ease;" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+        </div>
+
+        <!-- golden-layout のルート（ここに全ペインが描画される） -->
+        <div id="gl-root"></div>
+
+        <!-- 各パネルの中身の供給元（非表示）。golden-layoutが各ペインへ移植する -->
+        <div id="panel-source" style="display: none;">
+
+        <!-- キャンバスエリア -->
+        <div id="canvas-area">
+            <div id="canvas-wrapper">
+                <div id="canvas-container"></div>
+            </div>
+        </div>
+
+        <!-- ツールパネル -->
+<div class="floating-panel" id="panel-tools" style="top: 20px; left: 20px; width: 160px;">
+            <div class="panel-header">ツール</div>
+            <div class="panel-content">
+                <button onclick="spawnElement('Button')">＋ ボタン</button>
+                <button onclick="spawnElement('TextInput')">＋ 入力欄</button>
+                <button onclick="spawnElement('Label')">＋ テキスト</button>
+                <button onclick="spawnElement('Rect')">＋ 図形(四角)</button>
+                <button onclick="spawnElement('Circle')">＋ 図形(丸)</button>
+                <button onclick="spawnElement('Triangle')">＋ 図形(三角)</button>
+                
+                <hr style="border-color:#444; margin:10px 0;">
+                <div style="font-size:11px; color:#aaa; margin-bottom:5px; font-weight:bold;">テンプレート</div>
+                <button onclick="spawnComponent('Hero')" style="background-color: #2d3436;">Hero (見出し)</button>
+                <button onclick="spawnComponent('Card')" style="background-color: #2d3436;">Card (カード)</button>
+                <button onclick="spawnComponent('FAQ')" style="background-color: #2d3436;">FAQ (Q&amp;A)</button>
+                <button onclick="spawnComponent('Slider')" style="background-color: #0984e3; margin-top:5px;">Slider (スライダー)</button>
+                <button onclick="spawnComponent('ArticleGrid')" style="background-color: #27ae60;">ArticleGrid (記事一覧)</button>
+                <button onclick="spawnComponent('Accordion')" style="background-color: #8e44ad;">Accordion (開閉Q&amp;A)</button>
+                <hr style="border-color:#444; margin:10px 0;">
+                <div style="font-size:10px; color:#aaa; text-align:center; margin-bottom:10px;">
+                    画像はPCから直接<br>ドラッグ＆ドロップ！
+                </div>
+                <button class="btn-danger" onclick="exportStatic()">🌐 静的サイト出力</button>
+                <button class="btn-action" onclick="exportLaravel()" style="margin-top:6px;">⚙️ Laravel出力</button>
+            </div>
+        </div>
+
+        <!-- ページパネル -->
+        <div class="floating-panel" id="panel-pages" style="top: 290px; left: 20px; width: 220px;">
+            <div class="panel-header">ページ</div>
+            <div class="panel-content" style="padding: 8px;">
+                <div id="page-list"></div>
+                <button class="btn-success" onclick="addPage()" style="margin-top:6px;">＋ ページを追加</button>
+                <button class="btn-action" onclick="addPageFolder()" style="margin-top:4px;">📁 フォルダを追加</button>
+            </div>
+        </div>
+
+        <!-- エクスプローラーパネル -->
+        <div class="floating-panel" id="panel-explorer" style="top: 470px; left: 20px; width: 220px; height: 280px;">
+            <div class="panel-header">エクスプローラー</div>
+            <div class="panel-content" id="layer-list" style="padding: 5px;"></div>
+            <div style="padding: 5px; border-top: 1px solid #444;">
+                <button class="btn-action" onclick="createEmptyFolder()" style="margin-bottom:5px;">📁 フォルダを追加</button>
+                <p style="font-size:10px; color:#aaa; margin:0 0 2px 0;">Ctrl+C/V: コピペ | Ctrl+Z: 戻る</p>
+                <p style="font-size:10px; color:#aaa; margin:0;">複数選択→プロパティで📁グループ化</p>
+            </div>
+        </div>
+
+        <!-- キャンバス設定パネル -->
+        <div class="floating-panel" id="panel-canvas" style="top: 20px; right: 20px; width: 280px;">
+            <div class="panel-header">プロジェクト設定</div>
+            <div class="panel-content">
+                <div class="form-group">
+                    <label>プロジェクト名（出力フォルダ名）</label>
+                    <input type="text" id="project-name" value="my-site" onchange="onProjectNameChange()">
+                </div>
+                <div class="form-group">
+                    <label>出力タイプ</label>
+                    <select id="output-type" onchange="onOutputTypeChange()">
+                        <option value="static">静的サイト（HTML）</option>
+                        <option value="laravel">Laravel（Blade）</option>
+                    </select>
+                </div>
+                <hr style="border-color:#444; margin:10px 0;">
+                <div style="font-size:11px; color:#aaa; margin-bottom:4px; font-weight:bold;">🎨 背景色</div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>サイト全体</label>
+                        <input type="color" id="site-bg-color" value="#f1f2f6" onchange="updateSiteBgColor()">
+                    </div>
+                    <div class="form-group">
+                        <label>このページ</label>
+                        <div style="display:flex; gap:4px; align-items:center;">
+                            <input type="color" id="page-bg-color" value="#f1f2f6" onchange="updatePageBgColor()" style="flex:1;">
+                            <button type="button" onclick="clearPageBgColor()" title="ページ個別指定を解除（サイト全体に従う）" style="width:auto; margin:0; padding:4px 8px; font-size:11px; background:#555;">解除</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="page-bg-status" style="font-size:10px; color:#888; margin-bottom:6px;"></div>
+                <hr style="border-color:#444; margin:10px 0;">
+                <div style="font-size:11px; color:#aaa; margin-bottom:4px; font-weight:bold;">💻 PC サイズ</div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>幅 (px)</label>
+                        <input type="number" id="canvas-width" value="800" onchange="updateCanvasSize()">
+                    </div>
+                    <div class="form-group">
+                        <label>高さ (px)</label>
+                        <input type="number" id="canvas-height" value="600" onchange="updateCanvasSize()">
+                    </div>
+                </div>
+                <div style="font-size:11px; color:#aaa; margin-bottom:4px; font-weight:bold;">📱 スマホ サイズ</div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>幅 (px)</label>
+                        <input type="number" id="canvas-mobile-width" value="375" onchange="updateCanvasSize()">
+                    </div>
+                    <div class="form-group">
+                        <label>高さ (px)</label>
+                        <input type="number" id="canvas-mobile-height" value="800" onchange="updateCanvasSize()">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>表示ズーム倍率 (%)</label>
+                    <input type="number" id="canvas-zoom" value="100" step="10" onchange="updateCanvasSize()">
+                </div>
+                <hr style="border-color:#444; margin:10px 0;">
+                <div class="row">
+                    <div class="form-group">
+                        <button class="btn-action" onclick="saveAndExport()">💾 上書き保存 (Ctrl+S)</button>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn-action" onclick="importJSON()">📂 読込</button>
+                    </div>
+                </div>
+                <button class="btn-action" onclick="newProject()" style="margin-top:4px;">🆕 新規プロジェクト</button>
+            </div>
+        </div>
+
+        <!-- プロパティパネル -->
+        <div class="floating-panel" id="panel-inspector" style="top: 220px; right: 20px; width: 280px; height: 520px;">
+            <div class="panel-header">プロパティ</div>
+
+            <div class="panel-content" id="ins-fields" style="display: none;">
+
+                <!-- 単一選択時 -->
+                <div id="ins-fields-single">    
+                    <div class="form-group">
+                        <label>レイヤー名</label>
+                        <input type="text" id="ins-name" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                    </div>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>X座標</label>
+                            <input type="number" id="ins-x" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                        </div>
+                        <div class="form-group">
+                            <label>Y座標</label>
+                            <input type="number" id="ins-y" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>幅 (W)</label>
+                            <input type="number" id="ins-w" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                        </div>
+                        <div class="form-group">
+                            <label>高さ (H)</label>
+                            <input type="number" id="ins-h" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                        </div>
+                    </div>
+                    <hr style="border-color:#444; margin:10px 0;">
+                    <div class="row">
+                        <div class="form-group">
+                            <label>シャドウ (影)</label>
+                            <select id="ins-shadow" onchange="onInspectorUpdate(true)">
+                                <option value="none">なし</option>
+                                <option value="light">薄め</option>
+                                <option value="dark">濃いめ</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>アニメーション</label>
+                            <select id="ins-animation" onchange="onInspectorUpdate(true)">
+                                <option value="none">なし</option>
+                                <option value="fadein">フェードイン</option>
+                                <option value="fadeup">下からフワッと</option>
+                                <option value="scale">拡大表示</option>
+                                <option value="slideleft">右からスライド</option>
+                                <option value="slideright">左からスライド</option>
+                            </select>
+                        </div>
+                    </div>
+                    <hr style="border-color:#444; margin:10px 0;">
+                    <div class="form-group" id="group-text">
+                        <label>テキスト内容</label>
+                        <input type="text" id="ins-text" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                    </div>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>背景色</label>
+                            <input type="color" id="ins-bgcolor" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                        </div>
+                        <div class="form-group">
+                            <label>文字色</label>
+                            <input type="color" id="ins-color" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                        </div>
+                    </div>
+<div class="form-group">
+                        <label>フォントサイズ</label>
+                        <input type="number" id="ins-fontsize" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                    </div>
+
+                    <div class="form-group" id="group-text-align" style="display: none;">
+                        <div class="row">
+                            <div class="form-group">
+                                <label>文字揃え</label>
+                                <select id="ins-align" onchange="onInspectorUpdate(true)">
+                                    <option value="left">左揃え</option>
+                                    <option value="center">中央揃え</option>
+                                    <option value="right">右揃え</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>フォント</label>
+                                <select id="ins-fontfamily" onchange="onInspectorUpdate(true)">
+                                    <option value="sans-serif">ゴシック体</option>
+                                    <option value="serif">明朝体</option>
+                                    <option value="monospace">等幅フォント</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" id="group-btn-bgimage" style="display: none; margin-top: 10px;">
+                        <label>ボタン背景画像</label>
+                        <div class="row" style="align-items: center; margin-bottom: 5px;">
+                            <span id="ins-bgimage-preview" style="color: #aaa; font-size: 11px;">なし</span>
+                            <div class="row" style="gap: 4px; width: 60%;">
+                                <button type="button" class="btn-action" onclick="changeButtonBgImage()" style="margin:0;">🖼️ 選択</button>
+                                <button type="button" class="btn-action" onclick="clearButtonBgImage()" style="margin:0; background-color:#cc4545;">✕ 解除</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ▼ スライダー専用設定 ▼ -->
+                    <div id="group-slider" style="display: none; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+                        <div style="font-weight:bold; font-size:11px; color:#aaa; margin-bottom:6px;">🖼️ スライダー設定</div>
+
+                        <button type="button" id="btn-open-slider-editor" class="btn-primary" onclick="openSliderEditor()" style="margin-bottom:8px;">
+                            📋 スライド一覧を編集
+                        </button>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>切替効果</label>
+                                <select id="ins-slider-effect" onchange="onInspectorUpdate(true)">
+                                    <option value="slide">スライド</option>
+                                    <option value="fade">フェード</option>
+                                    <option value="cube">キューブ</option>
+                                    <option value="coverflow">カバーフロー</option>
+                                    <option value="cards">カード</option>
+                                    <option value="grid">グリッド(複数枚)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>表示枚数</label>
+                                <input type="number" id="ins-slider-perview" value="1" min="1" max="6" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>切替速度 (ms)</label>
+                            <input type="number" id="ins-slider-speed" value="600" min="100" step="100" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label><input type="checkbox" id="ins-slider-autoplay" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 自動再生</label>
+                            </div>
+                            <div class="form-group">
+                                <label>間隔 (ms)</label>
+                                <input type="number" id="ins-slider-delay" value="3000" min="500" step="500" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label><input type="checkbox" id="ins-slider-loop" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> ループ再生</label>
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" id="ins-slider-pagination" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> ドット表示</label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label><input type="checkbox" id="ins-slider-navigation" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 左右ナビ矢印を表示</label>
+                        </div>
+                    </div>
+                    <!-- ▲ スライダー専用設定 ▲ -->
+
+                    <!-- ▼ 記事グリッド専用設定 ▼ -->
+                    <div id="group-grid" style="display: none; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+                        <div style="font-weight:bold; font-size:11px; color:#aaa; margin-bottom:6px;">📰 記事グリッド設定</div>
+
+                        <button type="button" id="btn-open-grid-editor" class="btn-primary" onclick="openGridEditor()" style="margin-bottom:8px;">
+                            📋 アイテム一覧を編集
+                        </button>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>カラム数</label>
+                                <input type="number" id="ins-grid-columns" value="3" min="1" max="6" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            </div>
+                            <div class="form-group">
+                                <label>余白 (px)</label>
+                                <input type="number" id="ins-grid-gap" value="20" min="0" step="5" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>カード角丸 (px)</label>
+                                <input type="number" id="ins-grid-radius" value="8" min="0" step="2" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            </div>
+                            <div class="form-group">
+                                <label>矢印ボタン色</label>
+                                <input type="color" id="ins-grid-arrow" value="#27ae60" onchange="onInspectorUpdate(true)">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>画像の高さ比率</label>
+                                <select id="ins-grid-imgratio" onchange="onInspectorUpdate(true)">
+                                    <option value="16/10">横長 (16:10)</option>
+                                    <option value="4/3">標準 (4:3)</option>
+                                    <option value="1/1">正方形 (1:1)</option>
+                                    <option value="3/4">縦長 (3:4)</option>
+                                    <option value="21/9">ワイド (21:9)</option>
+                                    <option value="none">画像なし/可変</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>カード内余白 (px)</label>
+                                <input type="number" id="ins-grid-padding" value="18" min="0" step="2" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="border-top:1px solid #444; padding-top:8px; margin-top:8px;">
+                            <label><input type="checkbox" id="ins-grid-slidermode" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 🎠 スライダーモード（横スクロール）</label>
+                        </div>
+                        <div id="group-grid-slider" style="display:none; padding-left:8px; border-left:2px solid #0984e3;">
+                            <div class="row">
+                                <div class="form-group">
+                                    <label><input type="checkbox" id="ins-grid-autoplay" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 自動再生</label>
+                                </div>
+                                <div class="form-group">
+                                    <label>間隔 (ms)</label>
+                                    <input type="number" id="ins-grid-delay" value="3000" min="500" step="500" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="form-group">
+                                    <label><input type="checkbox" id="ins-grid-loop" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> ループ</label>
+                                </div>
+                                <div class="form-group">
+                                    <label><input type="checkbox" id="ins-grid-nav" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 矢印ナビ</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- ▲ 記事グリッド専用設定 ▲ -->
+
+                    <!-- ▼ アコーディオン専用設定 ▼ -->
+                    <div id="group-accordion" style="display: none; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+                        <div style="font-weight:bold; font-size:11px; color:#aaa; margin-bottom:6px;">🪗 アコーディオン設定</div>
+
+                        <button type="button" id="btn-open-accordion-editor" class="btn-primary" onclick="openAccordionEditor()" style="margin-bottom:8px;">
+                            📋 項目一覧を編集
+                        </button>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <label>見出し文字色</label>
+                                <input type="color" id="ins-acc-headercolor" value="#2c3e50" onchange="onInspectorUpdate(true)">
+                            </div>
+                            <div class="form-group">
+                                <label>見出し背景色</label>
+                                <input type="color" id="ins-acc-headerbg" value="#f7f9fa" onchange="onInspectorUpdate(true)">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>本文文字色</label>
+                                <input type="color" id="ins-acc-bodycolor" value="#555555" onchange="onInspectorUpdate(true)">
+                            </div>
+                            <div class="form-group">
+                                <label><input type="checkbox" id="ins-acc-openfirst" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 最初を開いた状態に</label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- ▲ アコーディオン専用設定 ▲ -->
+                    <hr style="border-color:#444; margin:10px 0;">
+                    <div class="form-group" id="group-backend">
+                        <label>リンク先URL（Googleフォーム等）</label>
+                        <input type="text" id="ins-route" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)" placeholder="https://forms.gle/...">
+                        <label style="margin-top:5px;">送信メソッド（Laravel出力時）</label>
+                        <select id="ins-method" onchange="onInspectorUpdate(true)">
+                            <option value="POST">POST</option>
+                            <option value="GET">GET</option>
+                        </select>
+                    </div>
+                    <hr style="border-color:#444; margin:10px 0;">
+                    <div style="font-size:11px; color:#aaa; margin-bottom:5px; font-weight:bold;">⚡ インタラクション (イベント)</div>
+                    <div id="ins-events-list" style="margin-bottom: 5px;">
+                        </div>
+                    <button class="btn-action" onclick="addEventTrigger()" style="background-color: #2b5c3e; border: none; margin-bottom: 10px;">
+                        ＋ 新しいイベントを追加
+                    </button>
+                    <hr style="border-color:#444; margin:10px 0;">
+                    <button id="btn-ungroup" class="btn-primary"
+                        style="display:none; background-color:#e67e22; border:none;"
+                        onclick="ungroupNodes()">
+                        📂 フォルダ解除
+                    </button>
+                    <button id="btn-warp" class="btn-primary"
+                        style="display:none; background-color:#9b59b6; border:none; margin-top:5px;"
+                        onclick="toggleWarpMode()">
+                        🔷 自由変形 (オン/オフ)
+                    </button>
+                </div>
+
+                <!-- 複数選択時 -->
+                <div id="ins-fields-multi" style="display:none;">
+                    <p style="color:#aaa; font-size:11px; text-align:center; margin-bottom: 10px;">複数要素が選択されています</p>
+                    <button class="btn-success" onclick="groupNodes()" style="margin-bottom:15px;">📁 フォルダ化 (グループ化)</button>
+                    
+                    <hr style="border-color:#444; margin:10px 0;">
+                    <div style="font-size:11px; color:#aaa; margin-bottom:5px; font-weight:bold;">📐 要素の整列</div>
+                    <div class="row" style="margin-bottom: 5px;">
+                        <button class="btn-action" onclick="alignNodes('left')">⬅️ 左揃え</button>
+                        <button class="btn-action" onclick="alignNodes('center')">↕️ 中央揃え(垂直)</button>
+                        <button class="btn-action" onclick="alignNodes('right')">➡️ 右揃え</button>
+                    </div>
+                    <div class="row">
+                        <button class="btn-action" onclick="alignNodes('top')">⬆️ 上揃え</button>
+                        <button class="btn-action" onclick="alignNodes('middle')">↔️ 中央揃え(水平)</button>
+                        <button class="btn-action" onclick="alignNodes('bottom')">⬇️ 下揃え</button>
+                    </div>
+                </div>
+                <button class="btn-primary"
+                    style="background-color:#cc4545; border:none; margin-top:10px;"
+                    onclick="deleteSelectedNode()">
+                    🗑️ 要素を削除
+                </button>
+            </div>
+
+            <div class="panel-content" id="ins-empty" style="text-align: center; color: #888;">
+                要素を選択してください
+            </div>
+        </div>
+
+        </div><!-- /#panel-source -->
+
+    </div>
+    <script type="module" src="main-renderer.js"></script>
+    <!-- ▼ スライド/アイテム編集モーダル（Slider/ArticleGrid共用） ▼ -->
+    <div id="slider-editor-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:99998; align-items:center; justify-content:center;">
+        <div style="background:#252526; border:1px solid #444; border-radius:8px; width:720px; max-width:90vw; max-height:85vh; display:flex; flex-direction:column;">
+            <div style="padding:12px 16px; background:#1e1e1e; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center; border-radius:8px 8px 0 0;">
+                <span id="slider-editor-title" style="font-weight:bold; color:#fff;">📋 アイテム一覧の編集</span>
+                <button onclick="closeSliderEditor()" style="width:auto; margin:0; padding:4px 10px; background:#444;">閉じる</button>
+            </div>
+            <div id="slider-editor-list" style="padding:12px 16px; overflow-y:auto; flex:1;"></div>
+            <div style="padding:10px 16px; border-top:1px solid #444; display:flex; gap:8px;">
+                <button onclick="addNewSlide()" class="btn-success" style="width:auto; margin:0;">＋ アイテムを追加</button>
+                <span id="slider-editor-hint" style="color:#888; font-size:11px; align-self:center; margin-left:10px;">画像枠にファイルをドラッグ＆ドロップしても追加できます</span>
+            </div>
+        </div>
+    </div>
+    <!-- ▲ スライド/アイテム編集モーダル ▲ -->
+
+    <!-- ▼ アコーディオン項目編集モーダル ▼ -->
+    <div id="accordion-editor-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:99998; align-items:center; justify-content:center;">
+        <div style="background:#252526; border:1px solid #444; border-radius:8px; width:640px; max-width:90vw; max-height:85vh; display:flex; flex-direction:column;">
+            <div style="padding:12px 16px; background:#1e1e1e; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center; border-radius:8px 8px 0 0;">
+                <span style="font-weight:bold; color:#fff;">📋 アコーディオン項目の編集</span>
+                <button onclick="closeAccordionEditor()" style="width:auto; margin:0; padding:4px 10px; background:#444;">閉じる</button>
+            </div>
+            <div id="accordion-editor-list" style="padding:12px 16px; overflow-y:auto; flex:1;"></div>
+            <div style="padding:10px 16px; border-top:1px solid #444;">
+                <button onclick="addAccordionItem()" class="btn-success" style="width:auto; margin:0;">＋ 項目を追加</button>
+            </div>
+        </div>
+    </div>
+    <!-- ▲ アコーディオン項目編集モーダル ▲ -->
+</body>
+</html>

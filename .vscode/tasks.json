@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "アプリを起動 (npm start)",
+            "type": "shell",
+            "command": "npm start",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "開発モードで起動 (npm run dev)",
+            "type": "shell",
+            "command": "npm run dev",
+            "problemMatcher": []
+        },
+        {
+            "label": "Windows用にビルド (.exe)",
+            "type": "shell",
+            "command": "npm run build:win",
+            "problemMatcher": []
+        }
+    ]
+}
