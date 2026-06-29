@@ -285,11 +285,17 @@ render() {
             }
 
             const shadow = props.shadow || 'none';
+            // シャドウ種別 → CSS値（offset x/y, blur, alpha）。Label は text-shadow を使う
+            const SHADOW_CSS = {
+                light:    '0 4px 10px rgba(0,0,0,0.15)',
+                dark:     '0 8px 15px rgba(0,0,0,0.4)',
+                hard:     '5px 5px 0 rgba(0,0,0,0.45)',
+                diagonal: '10px 10px 14px rgba(0,0,0,0.3)',
+                float:    '0 20px 30px rgba(0,0,0,0.28)',
+            };
             let shadowStyle = '';
-            if (shadow === 'light') {
-                shadowStyle = type === 'Label' ? 'text-shadow: 0 4px 10px rgba(0,0,0,0.15);' : 'box-shadow: 0 4px 10px rgba(0,0,0,0.15);';
-            } else if (shadow === 'dark') {
-                shadowStyle = type === 'Label' ? 'text-shadow: 0 8px 15px rgba(0,0,0,0.4);' : 'box-shadow: 0 8px 15px rgba(0,0,0,0.4);';
+            if (SHADOW_CSS[shadow]) {
+                shadowStyle = (type === 'Label' ? 'text-shadow: ' : 'box-shadow: ') + SHADOW_CSS[shadow] + ';';
             }
 
             // width等を除いたベーススタイル
