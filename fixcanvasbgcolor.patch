@@ -1,0 +1,50 @@
+From 2d2b8ff00527970a4d8c44302ac844fbb26bf71c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 29 Jun 2026 06:45:08 +0000
+Subject: [PATCH] =?UTF-8?q?fix:=20=E8=83=8C=E6=99=AF=E8=89=B2=E3=81=8C=20P?=
+ =?UTF-8?q?lay/=E5=87=BA=E5=8A=9B=E3=81=AB=E5=8F=8D=E6=98=A0=E3=81=95?=
+ =?UTF-8?q?=E3=82=8C=E3=81=AA=E3=81=84=E4=B8=8D=E5=85=B7=E5=90=88=E3=82=92?=
+ =?UTF-8?q?=E4=BF=AE=E6=AD=A3?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+.site-canvas の background-color が #ffffff 固定だったため、エディタ上は
+色が変わるのに Play プレビュー・静的/Laravel 出力ではページ本体が白いまま
+だった。解決済みの bgColor を .site-canvas にも適用するように修正。
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018QUNmbrFienrbofFDS47U6
+---
+ src/renderer/renderer.js | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/renderer/renderer.js b/src/renderer/renderer.js
+index b48cbb7..38cea3a 100644
+--- a/src/renderer/renderer.js
++++ b/src/renderer/renderer.js
+@@ -53,8 +53,12 @@ render() {
+ 
+         const elementsHtml = this.renderElements(this.scene.elements || [], cw, ch, 1);
+ 
++        // 背景色（ページ個別→サイト共通の解決済み値）。
++        // ページ本体(.site-canvas)にも適用しないとエディタと出力で色が一致しない。
++        const bgColor = this.scene.bgColor || '#f1f2f6';
++
+         this.dynamicCss.push(
+-            `.site-canvas { position: relative; width: 100%; max-width: ${cw}px; aspect-ratio: ${cw} / ${ch}; background-color: #ffffff; box-shadow: 0 0 30px rgba(0,0,0,0.1); overflow: hidden; margin: 0 auto; transition: all 0.3s ease; }`
++            `.site-canvas { position: relative; width: 100%; max-width: ${cw}px; aspect-ratio: ${cw} / ${ch}; background-color: ${bgColor}; box-shadow: 0 0 30px rgba(0,0,0,0.1); overflow: hidden; margin: 0 auto; transition: all 0.3s ease; }`
+         );
+         this.dynamicCss.push(
+             `@media (max-width: 768px) { .site-canvas { max-width: 100%; aspect-ratio: ${this._mobileW} / ${this._mobileCanvasH}; } }`
+@@ -98,7 +102,6 @@ render() {
+             html += '    <style>:root { --swiper-theme-color: #ffffff; }</style>\n';
+         }
+ 
+-        const bgColor = this.scene.bgColor || '#f1f2f6';
+         html += `</head>\n<body style="margin: 0; background-color: ${bgColor};">\n\n`;
+         
+         // ▼▼ フォーム: 送信ボタンがあればページ全体を <form> でラップ ▼▼
+-- 
+2.43.0
+

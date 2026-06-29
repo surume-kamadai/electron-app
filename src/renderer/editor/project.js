@@ -30,10 +30,13 @@ function createEmptyProject() {
             canvas: { width: 800, height: 600, mobileWidth: 375, mobileHeight: 800 },
             outputType: 'static',   // 'static' | 'laravel'
             siteBgColor: '#f1f2f6', // サイト全体のデフォルト背景色
+            // サイト共通のSEO初期値（各ページが未指定ならこれを使う）
+            seo: { siteName: '', lang: 'ja', description: '', ogImage: '' },
         },
         folders: [],                // [{ id, name }] ページ分類用フォルダ
         pages: [
-            { id: 'page_1', name: 'index', elements: [], folderId: null, bgColor: '' },
+            { id: 'page_1', name: 'index', elements: [], folderId: null, bgColor: '',
+              seo: { title: '', description: '', ogImage: '' } },
         ],
         activePageId: 'page_1',
     };
@@ -88,7 +91,8 @@ export function addPage(name) {
     pageCounter++;
     const id = 'page_' + pageCounter;
     const pageName = name || ('page' + pageCounter);
-    project.pages.push({ id, name: pageName, elements: [], folderId: null, bgColor: '' });
+    project.pages.push({ id, name: pageName, elements: [], folderId: null, bgColor: '',
+                         seo: { title: '', description: '', ogImage: '' } });
     project.activePageId = id;
     loadPageToCanvas(getActivePage());
     return id;
@@ -221,6 +225,14 @@ export function loadProject(jsonStr) {
     }
     (project.pages || []).forEach(p => {
         if (p.bgColor === undefined) p.bgColor = '';
+    });
+
+    // 後方互換: SEO設定が無ければ補う
+    if (project.settings && !project.settings.seo) {
+        project.settings.seo = { siteName: '', lang: 'ja', description: '', ogImage: '' };
+    }
+    (project.pages || []).forEach(p => {
+        if (!p.seo) p.seo = { title: '', description: '', ogImage: '' };
     });
 
     // 方針A移行: 古い不正な layouts/mobileEdited を一掃する。

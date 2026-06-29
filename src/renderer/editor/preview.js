@@ -14,10 +14,21 @@ export function playPreview() {
     const activePage = getActivePage();
     if (!activePage) return;
 
+    // SEO解決（ページ個別→サイト共通の順でフォールバック）
+    const site = project.settings?.seo || {};
+    const pseo = activePage.seo || {};
+    const baseTitle = (pseo.title && pseo.title.trim()) || activePage.name;
     const sceneData = {
         canvas: project.settings?.canvas,
         bgColor: activePage.bgColor || project.settings?.siteBgColor || '#f1f2f6',
-        elements: activePage.elements || []
+        elements: activePage.elements || [],
+        seo: {
+            lang: site.lang || 'ja',
+            title: site.siteName ? `${baseTitle} | ${site.siteName}` : baseTitle,
+            description: (pseo.description && pseo.description.trim()) || site.description || '',
+            ogImage: (pseo.ogImage && pseo.ogImage.trim()) || site.ogImage || '',
+            siteName: site.siteName || '',
+        },
     };
 
     // 2. 出力エンジンで現在のページのHTMLを生成（画像はBase64のまま埋め込む）

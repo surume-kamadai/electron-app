@@ -67,6 +67,12 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         shadow:   'none',
         animation:'none',
         bgimage:  '',
+        // フォーム用: Button の役割（'link' | 'submit'）
+        role:     type === 'Button' ? 'link' : 'none',
+        // フォーム用: TextInput の入力欄設定
+        inputName: '',
+        inputType: 'text',   // text | email | tel | number | textarea
+        required:  false,
         layouts: loadData ? (loadData.properties.layouts || {}) : {},
         mobileEdited: loadData ? !!loadData.properties.mobileEdited : false,
         events:   loadData && loadData.properties.events ? loadData.properties.events : []
