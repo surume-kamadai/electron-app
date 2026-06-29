@@ -53,8 +53,12 @@ render() {
 
         const elementsHtml = this.renderElements(this.scene.elements || [], cw, ch, 1);
 
+        // 背景色（ページ個別→サイト共通の解決済み値）。
+        // ページ本体(.site-canvas)にも適用しないとエディタと出力で色が一致しない。
+        const bgColor = this.scene.bgColor || '#f1f2f6';
+
         this.dynamicCss.push(
-            `.site-canvas { position: relative; width: 100%; max-width: ${cw}px; aspect-ratio: ${cw} / ${ch}; background-color: #ffffff; box-shadow: 0 0 30px rgba(0,0,0,0.1); overflow: hidden; margin: 0 auto; transition: all 0.3s ease; }`
+            `.site-canvas { position: relative; width: 100%; max-width: ${cw}px; aspect-ratio: ${cw} / ${ch}; background-color: ${bgColor}; box-shadow: 0 0 30px rgba(0,0,0,0.1); overflow: hidden; margin: 0 auto; transition: all 0.3s ease; }`
         );
         this.dynamicCss.push(
             `@media (max-width: 768px) { .site-canvas { max-width: 100%; aspect-ratio: ${this._mobileW} / ${this._mobileCanvasH}; } }`
@@ -98,7 +102,6 @@ render() {
             html += '    <style>:root { --swiper-theme-color: #ffffff; }</style>\n';
         }
 
-        const bgColor = this.scene.bgColor || '#f1f2f6';
         html += `</head>\n<body style="margin: 0; background-color: ${bgColor};">\n\n`;
         
         // ▼▼ フォーム: 送信ボタンがあればページ全体を <form> でラップ ▼▼
