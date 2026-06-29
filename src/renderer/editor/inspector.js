@@ -5,7 +5,7 @@ import { layer, tr } from './canvas.js';
 import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
 import { saveHistory } from './history.js';
 import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle } from './elements.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover } from './elements.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { showToast } from './toast.js';
 
@@ -137,6 +137,13 @@ export function updateInspectorFromNode() {
         groupBtnRole.style.display = (type === 'Button') ? 'block' : 'none';
         const roleSel = document.getElementById('ins-btn-role');
         if (roleSel) roleSel.value = bData.role || 'link';
+        // 送信完了メッセージ欄は「送信ボタン」時のみ表示
+        const groupSuccess = document.getElementById('group-success-msg');
+        if (groupSuccess) {
+            groupSuccess.style.display = (type === 'Button' && bData.role === 'submit') ? 'block' : 'none';
+            const sm = document.getElementById('ins-success-message');
+            if (sm) sm.value = bData.successMessage ?? '送信ありがとうございました。';
+        }
     }
     // ▼ フォーム: 入力欄（TextInput）の項目設定
     const groupInput = document.getElementById('group-input');
@@ -205,7 +212,11 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
 
     // フォーム関連の保存
     const roleSel = document.getElementById('ins-btn-role');
-    if (roleSel && node.getAttr('uiType') === 'Button') bData.role = roleSel.value;
+    if (roleSel && node.getAttr('uiType') === 'Button') {
+        bData.role = roleSel.value;
+        const sm = document.getElementById('ins-success-message');
+        if (sm) bData.successMessage = sm.value;
+    }
     if (node.getAttr('uiType') === 'TextInput') {
         bData.inputName = document.getElementById('ins-input-name').value;
         bData.inputType = document.getElementById('ins-input-type').value;
@@ -310,6 +321,8 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
             parseInt(document.getElementById('ins-w').value),
             parseInt(document.getElementById('ins-h').value)
         ) / 2);
+    } else if (type === 'Image') {
+        applyImageCover(node);
     }
 
     node.setAttr('bladeData', bData);

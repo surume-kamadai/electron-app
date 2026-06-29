@@ -5,7 +5,7 @@ import { spawnElement, groupNodes, ungroupNodes, createEmptyFolder,spawnComponen
 import { onInspectorUpdate, deleteSelectedNode, alignNodes } from './editor/inspector.js';
 import { saveAndExport, importJSON, startAutoSave } from './editor/api.js';
 import { renderExplorer } from './editor/explorer.js';
-import { saveHistory, clearPageHistory } from './editor/history.js';
+import { saveHistory, clearPageHistory, undo, redo } from './editor/history.js';
 import { enterWarpMode, exitWarpMode } from './editor/warp.js';
 import { selectedNodes } from './editor/state.js';
 import { switchDevice } from './editor/display.js';
@@ -51,6 +51,10 @@ window.clearPageBgColor    = clearPageBgColor;
 window.__syncBgColorUI     = syncBgColorUI;
 window.updateSiteSeo       = updateSiteSeo;
 window.updatePageSeo       = updatePageSeo;
+
+// --- 履歴（元に戻す / やり直し）---
+window.undo = undo;
+window.redo = redo;
 
 
 // --- ページ操作 ---
@@ -128,6 +132,7 @@ if (window.electronAPI?.onMenuAction) {
             case 'open-project': window.importJSON?.();   break;
             case 'save-export':  window.exportStatic?.();  break;
             case 'undo':         window.undo?.();          break;
+            case 'redo':         window.redo?.();          break;
             case 'reset-layout': window.location.reload(); break;
         }
     });
