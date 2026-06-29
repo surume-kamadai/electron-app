@@ -17,73 +17,112 @@ import { exitWarpMode, isWarpMode, getWarpTarget } from './warp.js';
 // ============================================================
 // ステージ: トランスフォーム完了時のグループスケール正規化
 // ============================================================
-stage.on('transformend dragend', (e) => {
-    // フック対象: 操作されたノード + 選択中のノード（複数選択ドラッグ対応）
-    const touched = new Set();
-    if (e.target && e.target.hasName && e.target.hasName('ui-element')) {
-        touched.add(e.target);
-    }
-    selectedNodes.forEach(n => touched.add(n));
 
-    touched.forEach(node => {
-        const type = node.getAttr('uiType');
+// Label / Button のリサイズを「scale」から「width/height + fontSize」へ正規化する。
+// ドラッグ中(transform)に毎フレーム呼ぶことで、スケール操作中もリアルタイムに
+// 文字サイズが変わる。フォント倍率は縦横の大きい方に追従（どの方向でも変化）。
+function normalizeResize(node) {
+    const type = node.getAttr('uiType');
+    const sx = node.scaleX(), sy = node.scaleY();
+    if (sx === 1 && sy === 1) return;
 
-        if (type === 'Image') { applyImageCover(node); return; }
+    // フォント倍率: どの方向のドラッグでも文字サイズが変わるよう、縦横の大きい方を使う
+    const fontFactor = Math.max(sx, sy);
 
-        if (type === 'Button') {
-            const scaleX = node.scaleX();
-            const scaleY = node.scaleY();
-            if (scaleX === 1 && scaleY === 1) return;
-
-            node.width(node.width()   * scaleX);
-            node.height(node.height() * scaleY);
-            node.scaleX(1);
-            node.scaleY(1);
-
-            const bg = node.findOne('.btn-bg');
-            const txt = node.findOne('.btn-text');
-            if (bg) { bg.width(node.width()); bg.height(node.height()); }
-            if (txt) { txt.width(node.width()); txt.height(node.height()); }
+    if (type === 'Label') {
+        node.width(Math.max(5, node.width()  * sx));
+        node.height(Math.max(5, node.height() * sy));
+        node.scaleX(1); node.scaleY(1);
+        const newFont = Math.max(8, node.fontSize() * fontFactor);
+        node.fontSize(newFont);
+        const b = node.getAttr('bladeData'); if (b) b.fontsize = newFont;
+    } else if (type === 'Button') {
+        node.width(Math.max(5, node.width()  * sx));
+        node.height(Math.max(5, node.height() * sy));
+        node.scaleX(1); node.scaleY(1);
+        const bg  = node.findOne('.btn-bg');
+        const txt = node.findOne('.btn-text');
+        if (bg) { bg.width(node.width()); bg.height(node.height()); }
+        if (txt) {
+            txt.width(node.width()); txt.height(node.height());
+            const newFont = Math.max(8, txt.fontSize() * fontFactor);
+            txt.fontSize(newFont);
+            const b = node.getAttr('bladeData'); if (b) b.fontsize = newFont;
         }
+    }
+}
 
-        if (type !== 'Group') return;
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-        if (scaleX === 1 && scaleY === 1) return;
-
-        node.getChildren().forEach(child => {
-            if (!child.hasName('ui-element')) return;
-            child.x(child.x() * scaleX);
-            child.y(child.y() * scaleY);
-            child.width(child.width()  * scaleX);
-            child.height(child.height() * scaleY);
-            
-            const childType = child.getAttr('uiType');
-            if (childType === 'Label') {
-                child.fontSize(child.fontSize() * Math.max(scaleX, scaleY));
-                child.getAttr('bladeData').fontsize = child.fontSize();
-            } else if (childType === 'Button') {
-                const bg = child.findOne('.btn-bg');
-                const txt = child.findOne('.btn-text');
-                if (bg) { bg.width(child.width()); bg.height(child.height()); }
-                if (txt) { txt.width(child.width()); txt.height(child.height()); }
-            }
-        });
-        node.width(node.width()   * scaleX);
-        node.height(node.height() * scaleY);
-        node.scaleX(1);
-        node.scaleY(1);
+// ドラッグ中もリアルタイムに正規化（スケール操作中に文字サイズが追従して変わる）。
+// transform イベントは stage に届かない場合があるため、Transformer 自身にも直接
+// フックし、対象は tr.nodes()（選択中のノード）から取得して確実に処理する。
+function liveNormalizeSelection() {
+    let any = false;
+    tr.nodes().forEach(node => {
+        const t = node.getAttr && node.getAttr('uiType');
+        if ((t === 'Label' || t === 'Button') && (node.scaleX() !== 1 || node.scaleY() !== 1)) {
+            normalizeResize(node);
+            any = true;
+        }
     });
+    if (any) layer.batchDraw();
+}
+tr.on('transform', liveNormalizeSelection);
+stage.on('transform', liveNormalizeSelection);
 
+// 1ノードのスケールを width/height(+font) に正規化する（Image はカバー再計算）
+function normalizeNode(node) {
+    const type = node.getAttr('uiType');
+    if (type === 'Image') { applyImageCover(node); return; }
+    if (type === 'Label' || type === 'Button') { normalizeResize(node); return; }
+    if (type !== 'Group') return;
+
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
+    if (scaleX === 1 && scaleY === 1) return;
+    node.getChildren().forEach(child => {
+        if (!child.hasName('ui-element')) return;
+        child.x(child.x() * scaleX);
+        child.y(child.y() * scaleY);
+        child.width(child.width()  * scaleX);
+        child.height(child.height() * scaleY);
+        const childType = child.getAttr('uiType');
+        if (childType === 'Label') {
+            child.fontSize(child.fontSize() * Math.max(scaleX, scaleY));
+            child.getAttr('bladeData').fontsize = child.fontSize();
+        } else if (childType === 'Button') {
+            const bg = child.findOne('.btn-bg');
+            const txt = child.findOne('.btn-text');
+            if (bg) { bg.width(child.width()); bg.height(child.height()); }
+            if (txt) { txt.width(child.width()); txt.height(child.height()); }
+        }
+    });
+    node.width(node.width()   * scaleX);
+    node.height(node.height() * scaleY);
+    node.scaleX(1);
+    node.scaleY(1);
+}
+
+// 変形/移動の完了処理（正規化→インスペクタ更新→履歴保存）
+function finalizeAfterTransform(nodes) {
+    nodes.forEach(normalizeNode);
     updateInspectorFromNode();
     renderExplorer();
     layer.batchDraw();
-    // 編集デバイスに応じて、PC配置のバックアップ or スマホ配置を更新
-    touched.forEach(node => {
-        updatePcGeom(node);
-        markMobileEdited(node);
-    });
+    nodes.forEach(node => { updatePcGeom(node); markMobileEdited(node); });
     saveHistory();
+}
+
+// リサイズ完了（Transformer のイベントを直接使う＝stageに届かない環境でも確実）
+tr.on('transformend', () => {
+    finalizeAfterTransform(tr.nodes());
+});
+
+// 移動完了（ドラッグ）。対象は操作ノード＋選択中ノード（複数選択移動対応）
+stage.on('dragend', (e) => {
+    const touched = new Set();
+    if (e.target && e.target.hasName && e.target.hasName('ui-element')) touched.add(e.target);
+    selectedNodes.forEach(n => touched.add(n));
+    finalizeAfterTransform([...touched]);
 });
 
 // ============================================================

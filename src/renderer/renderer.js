@@ -106,20 +106,31 @@ render() {
         
         // ▼▼ フォーム: 送信ボタンがあればページ全体を <form> でラップ ▼▼
         const submit = this._findSubmitButton(this.scene.elements || []);
-        let formOpen = '', formClose = '';
+        let formOpen = '', formClose = '', afterCanvas = '';
         if (submit) {
             const userAction = (submit.route && submit.route !== '#') ? submit.route : '';
+            const successMsg = (submit.successMessage ?? '送信ありがとうございました。');
             if (this.mode === 'blade') {
                 // Laravel: exporter が決めた action を優先、無ければ /contact
                 const action = escapeHtml(this.scene.formAction || userAction || '/contact');
                 formOpen  = `<form action="${action}" method="POST">\n@csrf`;
                 formClose = `</form>`;
+                // 送信後: controller の back()->with('success', ...) を受けて表示
+                if (successMsg) afterCanvas = this._successOverlay(escapeHtml(successMsg), true);
             } else {
                 // 静的: Googleフォーム/Formspree 等のエンドポイントへ送信
                 const action = escapeHtml(userAction || '#');
                 const method = (submit.method || 'POST').toUpperCase() === 'GET' ? 'GET' : 'POST';
-                formOpen  = `<form action="${action}" method="${method}">`;
-                formClose = `</form>`;
+                if (successMsg) {
+                    // 完了メッセージあり: 隠しiframeへ送信してページ遷移させず、メッセージを表示
+                    formOpen  = `<form action="${action}" method="${method}" target="ksb_form_target" onsubmit="setTimeout(function(){var s=document.getElementById('ksb-form-success');if(s)s.style.display='flex';},400);">`;
+                    formClose = `</form>`;
+                    afterCanvas = `<iframe name="ksb_form_target" style="display:none"></iframe>\n` + this._successOverlay(escapeHtml(successMsg), false);
+                } else {
+                    // 完了メッセージなし: 送信先ページへそのまま遷移
+                    formOpen  = `<form action="${action}" method="${method}">`;
+                    formClose = `</form>`;
+                }
             }
         }
 
@@ -128,6 +139,7 @@ render() {
         html += elementsHtml;
         if (formClose) html += formClose + '\n';
         html += '\n</div>\n';
+        if (afterCanvas) html += afterCanvas + '\n';
         
         // ▼▼ 追加: スライダーがあればSwiperのJS本体を読み込む ▼▼
         if (elementsHtml.includes('class="swiper')) {
@@ -153,6 +165,17 @@ render() {
             }
         }
         return null;
+    }
+
+    // 送信完了メッセージの中央オーバーレイ。
+    // 静的は display:none で出力し JS で表示。Blade は session('success') で表示。
+    _successOverlay(msg, isBlade) {
+        const inner = `<div style="background:#fff; padding:24px 32px; border-radius:10px; font-size:16px; color:#222; box-shadow:0 10px 40px rgba(0,0,0,0.3); max-width:80%; text-align:center;">${msg}<br><button type="button" onclick="document.getElementById('ksb-form-success').style.display='none'" style="margin-top:16px; padding:8px 20px; border:none; border-radius:6px; background:#007acc; color:#fff; cursor:pointer;">OK</button></div>`;
+        const style = `position:fixed; inset:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:9999;`;
+        if (isBlade) {
+            return `@if(session('success'))\n<div id="ksb-form-success" style="display:flex; ${style}">${inner}</div>\n@endif`;
+        }
+        return `<div id="ksb-form-success" style="display:none; ${style}">${inner}</div>`;
     }
 
     renderElements(elements, parentW, parentH, depth) {
@@ -262,11 +285,17 @@ render() {
             }
 
             const shadow = props.shadow || 'none';
+            // シャドウ種別 → CSS値（offset x/y, blur, alpha）。Label は text-shadow を使う
+            const SHADOW_CSS = {
+                light:    '0 4px 10px rgba(0,0,0,0.15)',
+                dark:     '0 8px 15px rgba(0,0,0,0.4)',
+                hard:     '5px 5px 0 rgba(0,0,0,0.45)',
+                diagonal: '10px 10px 14px rgba(0,0,0,0.3)',
+                float:    '0 20px 30px rgba(0,0,0,0.28)',
+            };
             let shadowStyle = '';
-            if (shadow === 'light') {
-                shadowStyle = type === 'Label' ? 'text-shadow: 0 4px 10px rgba(0,0,0,0.15);' : 'box-shadow: 0 4px 10px rgba(0,0,0,0.15);';
-            } else if (shadow === 'dark') {
-                shadowStyle = type === 'Label' ? 'text-shadow: 0 8px 15px rgba(0,0,0,0.4);' : 'box-shadow: 0 8px 15px rgba(0,0,0,0.4);';
+            if (SHADOW_CSS[shadow]) {
+                shadowStyle = (type === 'Label' ? 'text-shadow: ' : 'box-shadow: ') + SHADOW_CSS[shadow] + ';';
             }
 
             // width等を除いたベーススタイル
@@ -352,7 +381,9 @@ render() {
             bgStyle = `background-image: url('${src}'); background-size: cover; background-position: center;`;
         }
 
-        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; ${shadowStyle}`;
+        // <button> はブラウザ既定で text-align:center になるため、揃え設定を明示する
+        const align = escapeHtml(props.align || 'center');
+        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; text-align: ${align}; ${shadowStyle}`;
         const formStyle = `margin: 0; position: absolute; width: 100%; height: 100%;`;
 
         // 送信ボタン: ページ全体を包む <form>（render側で出力）が送信を担うので

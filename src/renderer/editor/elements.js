@@ -392,14 +392,24 @@ export function applyNodeShadow(node, shadowType) {
     // Group や、シャドウを直接持てないノードはスキップ
     if (uiType === 'Group' || !target || typeof target.shadowColor !== 'function') return;
 
-    if (!shadowType || shadowType === 'none') {
+    // シャドウ種別ごとの設定（offsetX, offsetY, blur, opacity）
+    const SHADOWS = {
+        light:    { x: 0,  y: 4,  blur: 10, opacity: 0.15 },
+        dark:     { x: 0,  y: 8,  blur: 15, opacity: 0.4  },
+        hard:     { x: 5,  y: 5,  blur: 0,  opacity: 0.45 }, // くっきり（ぼかしなし）
+        diagonal: { x: 10, y: 10, blur: 14, opacity: 0.3  }, // 斜め
+        float:    { x: 0,  y: 20, blur: 30, opacity: 0.28 }, // 浮遊（大きめ）
+    };
+
+    if (!shadowType || shadowType === 'none' || !SHADOWS[shadowType]) {
         target.shadowOpacity(0);
     } else {
+        const s = SHADOWS[shadowType];
         target.shadowColor('#000000');
-        target.shadowOffsetX(0);
-        target.shadowOffsetY(shadowType === 'light' ? 4 : 8);
-        target.shadowBlur(shadowType === 'light' ? 10 : 15);
-        target.shadowOpacity(shadowType === 'light' ? 0.15 : 0.4);
+        target.shadowOffsetX(s.x);
+        target.shadowOffsetY(s.y);
+        target.shadowBlur(s.blur);
+        target.shadowOpacity(s.opacity);
     }
 }
 

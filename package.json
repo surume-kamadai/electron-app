@@ -1,6 +1,6 @@
 {
-  "name": "laravel-gui-site-builder",
-  "version": "1.0.1",
+  "name": "site-builder",
+  "version": "1.0.2",
   "description": "GUIでデザインしてHTML/Laravel Bladeを生成するサイトビルダー",
   "main": "src/main/main.js",
   "scripts": {

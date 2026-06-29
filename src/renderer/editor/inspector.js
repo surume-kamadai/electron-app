@@ -20,6 +20,13 @@ async function pickImageDialog() {
     }
 }
 
+// type=color 入力に安全に値を設定する（#rrggbb 以外は既定値にフォールバック）
+function setColorInput(id, val, def) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = (typeof val === 'string' && /^#[0-9a-fA-F]{6}$/.test(val)) ? val : def;
+}
+
 export function hideInspector() {
     document.getElementById('ins-fields').style.display = 'none';
     document.getElementById('ins-empty').style.display  = 'block';
@@ -49,9 +56,11 @@ export function updateInspectorFromNode() {
     document.getElementById('ins-y').value        = Math.round(node.y());
     document.getElementById('ins-w').value        = Math.round(node.width());
     document.getElementById('ins-h').value        = Math.round(node.height());
-    document.getElementById('ins-text').value     = bData.text;
-    document.getElementById('ins-bgcolor').value  = bData.bgcolor;
-    document.getElementById('ins-color').value    = bData.color;
+    document.getElementById('ins-text').value     = bData.text ?? '';
+    // type=color は #rrggbb 以外（undefined / 'transparent' 等）を入れるとコンソール
+    // エラーになるので、妥当な16進カラーのみ反映し、それ以外は無難な既定値にする。
+    setColorInput('ins-bgcolor', bData.bgcolor, '#ffffff');
+    setColorInput('ins-color',   bData.color,   '#000000');
     document.getElementById('ins-align').value      = bData.align || 'left';
     document.getElementById('ins-fontfamily').value = bData.fontfamily || 'sans-serif';
     
