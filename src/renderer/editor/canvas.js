@@ -21,6 +21,11 @@ export const tr = new Konva.Transformer({
         'bottom-left', 'bottom-center', 'bottom-right',
     ],
     rotateEnabled: true,
+    // 最小サイズガード: 小さくし過ぎてトランスフォーマーが壊れる/文字が消えるのを防ぐ
+    boundBoxFunc: (oldBox, newBox) => {
+        if (newBox.width < 12 || newBox.height < 12) return oldBox;
+        return newBox;
+    },
 });
 layer.add(tr);
 
