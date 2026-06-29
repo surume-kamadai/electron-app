@@ -130,18 +130,30 @@ function createLayerItem(node, container, depth) {
         e.stopPropagation();
         if (!draggedNode || draggedNode === node) return;
 
-        // 祖先へのドロップは禁止
-        let p = node.parent;
-        while (p) { if (p === draggedNode) return; p = p.parent; }
+        // 複数選択中で、掴んだ要素が選択に含まれていれば「選択全体」を移動する。
+        // そうでなければ単一ノードのみ移動。
+        const nodesToMove = (selectedNodes.includes(draggedNode) && selectedNodes.length > 1)
+            ? [...selectedNodes]
+            : [draggedNode];
 
-        const absPos = draggedNode.getAbsolutePosition();
-        if (node.getAttr('uiType') === 'Group') {
-            draggedNode.moveTo(node);
-        } else {
-            draggedNode.moveTo(node.parent);
-            draggedNode.setZIndex(node.getZIndex() + 1);
-        }
-        draggedNode.absolutePosition(absPos);
+        const targetIsGroup = node.getAttr('uiType') === 'Group';
+        const destParent    = targetIsGroup ? node : node.parent;
+
+        // エクスプローラー表示順を保つため、元の重なり順でまとめて移動
+        nodesToMove.forEach(moving => {
+            if (moving === node) return;  // ターゲット自身は除外
+
+            // 祖先（自分自身を含む）への移動は禁止（循環防止）
+            let p = destParent, bad = false;
+            while (p) { if (p === moving) { bad = true; break; } p = p.parent; }
+            if (bad) return;
+
+            const absPos = moving.getAbsolutePosition();
+            moving.moveTo(destParent);
+            if (!targetIsGroup) moving.setZIndex(node.getZIndex() + 1);
+            moving.absolutePosition(absPos);
+        });
+
         tr.moveToTop();
         updateInspectorFromNode();
         renderExplorer();
