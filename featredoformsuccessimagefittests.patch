@@ -1,0 +1,543 @@
+From d8fa1f35606866553d8fdcf8451f2508b599c0ea Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 29 Jun 2026 10:11:36 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20Redo=20/=20=E3=83=95=E3=82=A9=E3=83=BC?=
+ =?UTF-8?q?=E3=83=A0=E9=80=81=E4=BF=A1=E5=BE=8C=E8=A1=A8=E7=A4=BA=20/=20?=
+ =?UTF-8?q?=E3=83=86=E3=83=B3=E3=83=97=E3=83=AC=E7=94=BB=E5=83=8F=E3=83=95?=
+ =?UTF-8?q?=E3=82=A3=E3=83=83=E3=83=88=20/=20=E3=83=86=E3=82=B9=E3=83=88?=
+ =?UTF-8?q?=E5=B0=8E=E5=85=A5?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+【Redo（やり直し）】
+- history.js に redo() を追加。Ctrl+Y / Ctrl+Shift+Z で前進、メニュー「やり直し」も追加。
+- ついでに window.undo が未定義でメニュー「元に戻す」が無反応だった件も修正
+  （undo/redo を main-renderer で window に配線、menu-action 'redo' を処理）。
+
+【フォーム送信後の表示】
+- 送信ボタンに「送信完了メッセージ」を追加。
+- 静的: 隠しiframeへ送信してページ遷移させず、中央オーバーレイで完了表示
+  （メッセージ空欄なら従来どおり送信先へ遷移）。
+- Laravel: @if(session('success')) のオーバーレイを出力（FormController が back()->with('success')）。
+
+【テンプレ画像のサイズフィット】
+- elements.js に applyImageCover() を追加し、Konva の crop で画像を枠に cover フィット
+  （出力の object-fit:cover と編集画面の見た目を一致）。
+  画像読込・リサイズ・インスペクタ編集・レスポンシブ切替時に適用。
+
+【テスト導入（Vitest）】
+- package.json に vitest と test スクリプトを追加。
+- test/renderer.test.js / test/exporter.test.js を追加（SEO・背景色・フォーム・
+  送信後表示・SEO解決・Laravelルート/コントローラ生成を検証）。
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018QUNmbrFienrbofFDS47U6
+---
+ package.json                     |  7 ++-
+ src/main/main.js                 |  1 +
+ src/renderer/editor/elements.js  | 35 +++++++++++-
+ src/renderer/editor/events.js    |  9 ++-
+ src/renderer/editor/history.js   |  9 +++
+ src/renderer/editor/inspector.js | 17 +++++-
+ src/renderer/index.html          |  5 ++
+ src/renderer/main-renderer.js    |  7 ++-
+ src/renderer/renderer.js         | 29 +++++++++-
+ test/exporter.test.js            | 61 ++++++++++++++++++++
+ test/renderer.test.js            | 98 ++++++++++++++++++++++++++++++++
+ 11 files changed, 266 insertions(+), 12 deletions(-)
+ create mode 100644 test/exporter.test.js
+ create mode 100644 test/renderer.test.js
+
+diff --git a/package.json b/package.json
+index 96540f9..c164ab7 100644
+--- a/package.json
++++ b/package.json
+@@ -8,13 +8,16 @@
+     "dev": "electron . --dev",
+     "build": "electron-builder",
+     "build:win": "electron-builder --win",
+-    "build:mac": "electron-builder --mac"
++    "build:mac": "electron-builder --mac",
++    "test": "vitest run",
++    "test:watch": "vitest"
+   },
+   "author": "",
+   "license": "MIT",
+   "devDependencies": {
+     "electron": "^31.0.0",
+-    "electron-builder": "^24.13.0"
++    "electron-builder": "^24.13.0",
++    "vitest": "^2.1.9"
+   },
+   "build": {
+     "appId": "com.example.site-builder",
+diff --git a/src/main/main.js b/src/main/main.js
+index d094c38..91397e5 100644
+--- a/src/main/main.js
++++ b/src/main/main.js
+@@ -37,6 +37,7 @@ function buildMenu() {
+             label: '編集',
+             submenu: [
+                 { label: '元に戻す', accelerator: 'CmdOrCtrl+Z', click: () => mainWindow.webContents.send('menu-action', 'undo') },
++                { label: 'やり直し', accelerator: 'CmdOrCtrl+Y', click: () => mainWindow.webContents.send('menu-action', 'redo') },
+                 { type: 'separator' },
+                 { role: 'cut',   label: '切り取り' },
+                 { role: 'copy',  label: 'コピー' },
+diff --git a/src/renderer/editor/elements.js b/src/renderer/editor/elements.js
+index 269d773..2208ac7 100644
+--- a/src/renderer/editor/elements.js
++++ b/src/renderer/editor/elements.js
+@@ -69,6 +69,8 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
+         bgimage:  '',
+         // フォーム用: Button の役割（'link' | 'submit'）
+         role:     type === 'Button' ? 'link' : 'none',
++        // フォーム送信ボタンの送信完了メッセージ（空なら遷移のみ）
++        successMessage: '送信ありがとうございました。',
+         // フォーム用: TextInput の入力欄設定
+         inputName: '',
+         inputType: 'text',   // text | email | tel | number | textarea
+@@ -158,7 +160,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
+             const img = new Image();
+             img.crossOrigin = 'Anonymous';
+             newNode = new Konva.Image({ ...base, image: img });
+-            img.onload = () => layer.batchDraw();
++            img.onload = () => { applyImageCover(newNode); layer.batchDraw(); };
+             img.onerror = () => {
+                 console.warn('画像の読み込みに失敗しました。ダミーに差し替えます:', bData.text);
+                 img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==';
+@@ -518,6 +520,35 @@ export function spawnComponent(componentName) {
+     saveHistory();
+ }
+ 
++// 画像を枠サイズに「cover」フィットさせる（縦横比を保ったまま枠を埋める）。
++// Konva の crop を使い、出力の object-fit:cover と編集画面の見た目を一致させる。
++export function applyImageCover(node) {
++    if (!node || node.getAttr('uiType') !== 'Image') return;
++    const img = node.image();
++    if (!img || !img.width || !img.height) return;
++    // 表示サイズ（スケール込み）の縦横比に合わせる
++    const w = node.width() * node.scaleX();
++    const h = node.height() * node.scaleY();
++    if (w <= 0 || h <= 0) return;
++    const boxAR = w / h;
++    const imgAR = img.width / img.height;
++    let cw, ch, cx, cy;
++    if (imgAR > boxAR) {
++        // 画像が横長 → 左右を切り取る
++        ch = img.height;
++        cw = img.height * boxAR;
++        cx = (img.width - cw) / 2;
++        cy = 0;
++    } else {
++        // 画像が縦長 → 上下を切り取る
++        cw = img.width;
++        ch = img.width / boxAR;
++        cx = 0;
++        cy = (img.height - ch) / 2;
++    }
++    node.crop({ x: cx, y: cy, width: cw, height: ch });
++}
++
+ export function applyTextStyle(node, bData) {
+     if (!node) return;
+     const type = node.getAttr('uiType');
+@@ -578,6 +609,8 @@ export function syncNodeToLayout(node, device) {
+         if (bg) { bg.width(l.w); bg.height(l.h); }
+         if (bgImgNode) { bgImgNode.width(l.w); bgImgNode.height(l.h); }
+         if (txt) { txt.width(l.w); txt.height(l.h); txt.fontSize(bData.fontsize); }
++    } else if (type === 'Image') {
++        applyImageCover(node);
+     }
+ 
+     if (type === 'Group') {
+diff --git a/src/renderer/editor/events.js b/src/renderer/editor/events.js
+index e3d8eca..808916d 100644
+--- a/src/renderer/editor/events.js
++++ b/src/renderer/editor/events.js
+@@ -4,8 +4,8 @@
+ // ============================================================
+ import { stage, layer, tr, selectionRect } from './canvas.js';
+ import { selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode } from './state.js';
+-import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes } from './elements.js';
+-import { saveHistory, undo } from './history.js';
++import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover } from './elements.js';
++import { saveHistory, undo, redo } from './history.js';
+ import { updateInspectorFromNode, deleteSelectedNode } from './inspector.js';
+ import { renderExplorer } from './explorer.js';
+ import { saveAndExport, importJSON, uploadImage } from './api.js';
+@@ -28,6 +28,8 @@ stage.on('transformend dragend', (e) => {
+     touched.forEach(node => {
+         const type = node.getAttr('uiType');
+ 
++        if (type === 'Image') { applyImageCover(node); return; }
++
+         if (type === 'Button') {
+             const scaleX = node.scaleX();
+             const scaleY = node.scaleY();
+@@ -474,7 +476,8 @@ window.addEventListener('keydown', e => {
+     if      (e.key === 'Delete' || e.key === 'Backspace')         { deleteSelectedNode(); }
+     else if (e.ctrlKey && (e.key === 'c' || e.key === 'C'))       { copySelected(); }
+     else if (e.ctrlKey && (e.key === 'v' || e.key === 'V'))       { pasteClipboard(); }
+-    else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z'))       { undo(); }
++    else if (e.ctrlKey && (e.key === 'y' || e.key === 'Y'))       { redo(); }
++    else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z'))       { e.shiftKey ? redo() : undo(); }
+ });
+ 
+ // ============================================================
+diff --git a/src/renderer/editor/history.js b/src/renderer/editor/history.js
+index 4294325..619eaa9 100644
+--- a/src/renderer/editor/history.js
++++ b/src/renderer/editor/history.js
+@@ -49,6 +49,15 @@ export function undo() {
+     isUndoOperation = false;
+ }
+ 
++export function redo() {
++    const hist = getCurrentHistory();
++    if (!hist || hist.index >= hist.states.length - 1) return;
++    hist.index++;
++    isUndoOperation = true;
++    loadFromState(JSON.parse(hist.states[hist.index]));
++    isUndoOperation = false;
++}
++
+ function loadFromState(elementsData) {
+     layer.find('.ui-element').forEach(n => n.destroy());
+     setSelectedNodes([]);
+diff --git a/src/renderer/editor/inspector.js b/src/renderer/editor/inspector.js
+index 765d8ea..1d61a6a 100644
+--- a/src/renderer/editor/inspector.js
++++ b/src/renderer/editor/inspector.js
+@@ -5,7 +5,7 @@ import { layer, tr } from './canvas.js';
+ import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
+ import { saveHistory } from './history.js';
+ import { renderExplorer } from './explorer.js';
+-import { applyNodeShadow, applyTextStyle } from './elements.js';
++import { applyNodeShadow, applyTextStyle, applyImageCover } from './elements.js';
+ import { markMobileEdited, updatePcGeom } from './display.js';
+ import { showToast } from './toast.js';
+ 
+@@ -137,6 +137,13 @@ export function updateInspectorFromNode() {
+         groupBtnRole.style.display = (type === 'Button') ? 'block' : 'none';
+         const roleSel = document.getElementById('ins-btn-role');
+         if (roleSel) roleSel.value = bData.role || 'link';
++        // 送信完了メッセージ欄は「送信ボタン」時のみ表示
++        const groupSuccess = document.getElementById('group-success-msg');
++        if (groupSuccess) {
++            groupSuccess.style.display = (type === 'Button' && bData.role === 'submit') ? 'block' : 'none';
++            const sm = document.getElementById('ins-success-message');
++            if (sm) sm.value = bData.successMessage ?? '送信ありがとうございました。';
++        }
+     }
+     // ▼ フォーム: 入力欄（TextInput）の項目設定
+     const groupInput = document.getElementById('group-input');
+@@ -205,7 +212,11 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
+ 
+     // フォーム関連の保存
+     const roleSel = document.getElementById('ins-btn-role');
+-    if (roleSel && node.getAttr('uiType') === 'Button') bData.role = roleSel.value;
++    if (roleSel && node.getAttr('uiType') === 'Button') {
++        bData.role = roleSel.value;
++        const sm = document.getElementById('ins-success-message');
++        if (sm) bData.successMessage = sm.value;
++    }
+     if (node.getAttr('uiType') === 'TextInput') {
+         bData.inputName = document.getElementById('ins-input-name').value;
+         bData.inputType = document.getElementById('ins-input-type').value;
+@@ -310,6 +321,8 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
+             parseInt(document.getElementById('ins-w').value),
+             parseInt(document.getElementById('ins-h').value)
+         ) / 2);
++    } else if (type === 'Image') {
++        applyImageCover(node);
+     }
+ 
+     node.setAttr('bladeData', bData);
+diff --git a/src/renderer/index.html b/src/renderer/index.html
+index bfb2766..f404df8 100644
+--- a/src/renderer/index.html
++++ b/src/renderer/index.html
+@@ -471,6 +471,11 @@
+                             <option value="submit">送信ボタン（フォーム送信）</option>
+                         </select>
+                     </div>
++                    <div class="form-group" id="group-success-msg" style="display:none;">
++                        <label>送信完了メッセージ</label>
++                        <input type="text" id="ins-success-message" placeholder="送信ありがとうございました。" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
++                        <div style="font-size:10px; color:#888; margin-top:2px;">空欄にすると送信先ページへそのまま遷移します</div>
++                    </div>
+                     <!-- ▲ ボタンの役割 ▲ -->
+ 
+                     <!-- ▼ 入力欄（フォーム項目）設定 ▼ -->
+diff --git a/src/renderer/main-renderer.js b/src/renderer/main-renderer.js
+index 132afee..1259afb 100644
+--- a/src/renderer/main-renderer.js
++++ b/src/renderer/main-renderer.js
+@@ -5,7 +5,7 @@ import { spawnElement, groupNodes, ungroupNodes, createEmptyFolder,spawnComponen
+ import { onInspectorUpdate, deleteSelectedNode, alignNodes } from './editor/inspector.js';
+ import { saveAndExport, importJSON, startAutoSave } from './editor/api.js';
+ import { renderExplorer } from './editor/explorer.js';
+-import { saveHistory, clearPageHistory } from './editor/history.js';
++import { saveHistory, clearPageHistory, undo, redo } from './editor/history.js';
+ import { enterWarpMode, exitWarpMode } from './editor/warp.js';
+ import { selectedNodes } from './editor/state.js';
+ import { switchDevice } from './editor/display.js';
+@@ -52,6 +52,10 @@ window.__syncBgColorUI     = syncBgColorUI;
+ window.updateSiteSeo       = updateSiteSeo;
+ window.updatePageSeo       = updatePageSeo;
+ 
++// --- 履歴（元に戻す / やり直し）---
++window.undo = undo;
++window.redo = redo;
++
+ 
+ // --- ページ操作 ---
+ window.addPage = onAddPage;
+@@ -128,6 +132,7 @@ if (window.electronAPI?.onMenuAction) {
+             case 'open-project': window.importJSON?.();   break;
+             case 'save-export':  window.exportStatic?.();  break;
+             case 'undo':         window.undo?.();          break;
++            case 'redo':         window.redo?.();          break;
+             case 'reset-layout': window.location.reload(); break;
+         }
+     });
+diff --git a/src/renderer/renderer.js b/src/renderer/renderer.js
+index 38cea3a..0085ddf 100644
+--- a/src/renderer/renderer.js
++++ b/src/renderer/renderer.js
+@@ -106,20 +106,31 @@ render() {
+         
+         // ▼▼ フォーム: 送信ボタンがあればページ全体を <form> でラップ ▼▼
+         const submit = this._findSubmitButton(this.scene.elements || []);
+-        let formOpen = '', formClose = '';
++        let formOpen = '', formClose = '', afterCanvas = '';
+         if (submit) {
+             const userAction = (submit.route && submit.route !== '#') ? submit.route : '';
++            const successMsg = (submit.successMessage ?? '送信ありがとうございました。');
+             if (this.mode === 'blade') {
+                 // Laravel: exporter が決めた action を優先、無ければ /contact
+                 const action = escapeHtml(this.scene.formAction || userAction || '/contact');
+                 formOpen  = `<form action="${action}" method="POST">\n@csrf`;
+                 formClose = `</form>`;
++                // 送信後: controller の back()->with('success', ...) を受けて表示
++                if (successMsg) afterCanvas = this._successOverlay(escapeHtml(successMsg), true);
+             } else {
+                 // 静的: Googleフォーム/Formspree 等のエンドポイントへ送信
+                 const action = escapeHtml(userAction || '#');
+                 const method = (submit.method || 'POST').toUpperCase() === 'GET' ? 'GET' : 'POST';
+-                formOpen  = `<form action="${action}" method="${method}">`;
+-                formClose = `</form>`;
++                if (successMsg) {
++                    // 完了メッセージあり: 隠しiframeへ送信してページ遷移させず、メッセージを表示
++                    formOpen  = `<form action="${action}" method="${method}" target="ksb_form_target" onsubmit="setTimeout(function(){var s=document.getElementById('ksb-form-success');if(s)s.style.display='flex';},400);">`;
++                    formClose = `</form>`;
++                    afterCanvas = `<iframe name="ksb_form_target" style="display:none"></iframe>\n` + this._successOverlay(escapeHtml(successMsg), false);
++                } else {
++                    // 完了メッセージなし: 送信先ページへそのまま遷移
++                    formOpen  = `<form action="${action}" method="${method}">`;
++                    formClose = `</form>`;
++                }
+             }
+         }
+ 
+@@ -128,6 +139,7 @@ render() {
+         html += elementsHtml;
+         if (formClose) html += formClose + '\n';
+         html += '\n</div>\n';
++        if (afterCanvas) html += afterCanvas + '\n';
+         
+         // ▼▼ 追加: スライダーがあればSwiperのJS本体を読み込む ▼▼
+         if (elementsHtml.includes('class="swiper')) {
+@@ -155,6 +167,17 @@ render() {
+         return null;
+     }
+ 
++    // 送信完了メッセージの中央オーバーレイ。
++    // 静的は display:none で出力し JS で表示。Blade は session('success') で表示。
++    _successOverlay(msg, isBlade) {
++        const inner = `<div style="background:#fff; padding:24px 32px; border-radius:10px; font-size:16px; color:#222; box-shadow:0 10px 40px rgba(0,0,0,0.3); max-width:80%; text-align:center;">${msg}<br><button type="button" onclick="document.getElementById('ksb-form-success').style.display='none'" style="margin-top:16px; padding:8px 20px; border:none; border-radius:6px; background:#007acc; color:#fff; cursor:pointer;">OK</button></div>`;
++        const style = `position:fixed; inset:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:9999;`;
++        if (isBlade) {
++            return `@if(session('success'))\n<div id="ksb-form-success" style="display:flex; ${style}">${inner}</div>\n@endif`;
++        }
++        return `<div id="ksb-form-success" style="display:none; ${style}">${inner}</div>`;
++    }
++
+     renderElements(elements, parentW, parentH, depth) {
+         let out = '';
+         const indent = '    '.repeat(depth);
+diff --git a/test/exporter.test.js b/test/exporter.test.js
+new file mode 100644
+index 0000000..9162ffb
+--- /dev/null
++++ b/test/exporter.test.js
+@@ -0,0 +1,61 @@
++import { describe, it, expect } from 'vitest';
++import { buildStaticProject, buildLaravelProject } from '../src/renderer/exporter.js';
++
++const project = (overrides = {}) => ({
++    settings: {
++        projectName: 'my-site',
++        canvas: { width: 800, height: 600, mobileWidth: 375, mobileHeight: 800 },
++        outputType: 'static',
++        siteBgColor: '#f1f2f6',
++        seo: { siteName: '店', lang: 'ja', description: '共通説明', ogImage: '' },
++    },
++    folders: [],
++    pages: [
++        { id: 'page_1', name: 'index', folderId: null, bgColor: '#ffffff',
++          seo: { title: 'トップ', description: '', ogImage: '' },
++          elements: [
++              { id: 'b1', type: 'Button', transform: { x: 0, y: 0, width: 100, height: 40 },
++                properties: { text: '送信', role: 'submit', route: '' } },
++              { id: 'ti', type: 'TextInput', transform: { x: 0, y: 50, width: 200, height: 40 },
++                properties: { inputName: 'email', inputType: 'email' } },
++          ] },
++    ],
++    activePageId: 'page_1',
++    ...overrides,
++});
++
++describe('buildStaticProject', () => {
++    it('index.html を生成し、解決済みSEOタイトル（ページ | サイト名）を含む', () => {
++        const out = buildStaticProject(project());
++        const idx = out.files.find(f => f.path === 'index.html');
++        expect(idx).toBeTruthy();
++        expect(idx.content).toContain('<title>トップ | 店</title>');
++    });
++
++    it('ページ説明が空ならサイト共通説明にフォールバックする', () => {
++        const out = buildStaticProject(project());
++        const idx = out.files.find(f => f.path === 'index.html');
++        expect(idx.content).toContain('content="共通説明"');
++    });
++
++    it('ページ背景色を .site-canvas に反映する', () => {
++        const out = buildStaticProject(project());
++        const idx = out.files.find(f => f.path === 'index.html');
++        expect(idx.content).toMatch(/\.site-canvas \{[^}]*background-color: #ffffff/);
++    });
++});
++
++describe('buildLaravelProject', () => {
++    it('送信ボタンがあると POST ルートと FormController を生成する', () => {
++        const out = buildLaravelProject(project());
++        const routes = out.files.find(f => f.path === 'routes/web.php');
++        expect(routes.content).toContain("Route::post('/index-submit'");
++        expect(out.files.some(f => f.path === 'app/Http/Controllers/FormController.php')).toBe(true);
++    });
++
++    it('Blade ビューに @csrf を含む', () => {
++        const out = buildLaravelProject(project());
++        const view = out.files.find(f => f.path === 'resources/views/index.blade.php');
++        expect(view.content).toContain('@csrf');
++    });
++});
+diff --git a/test/renderer.test.js b/test/renderer.test.js
+new file mode 100644
+index 0000000..b7d4537
+--- /dev/null
++++ b/test/renderer.test.js
+@@ -0,0 +1,98 @@
++import { describe, it, expect } from 'vitest';
++import { HtmlRenderer } from '../src/renderer/renderer.js';
++
++function render(scene, mode = 'static') {
++    return new HtmlRenderer(scene, { mode, imageMap: new Map() }).render();
++}
++
++const base = (overrides = {}) => ({
++    canvas: { width: 800, height: 600, mobileWidth: 375, mobileHeight: 800 },
++    bgColor: '#ffcc00',
++    seo: { lang: 'ja', title: 'テストページ', description: '説明', ogImage: 'https://x/og.png', siteName: '店' },
++    elements: [],
++    ...overrides,
++});
++
++describe('HtmlRenderer SEO', () => {
++    it('title / description / OGP / lang を出力する', () => {
++        const h = render(base());
++        expect(h).toContain('<html lang="ja">');
++        expect(h).toContain('<title>テストページ</title>');
++        expect(h).toContain('<meta name="description" content="説明">');
++        expect(h).toContain('property="og:title" content="テストページ"');
++        expect(h).toContain('property="og:image" content="https://x/og.png"');
++        expect(h).toContain('name="twitter:card" content="summary_large_image"');
++    });
++
++    it('SEO値のHTMLをエスケープする', () => {
++        const h = render(base({ seo: { title: '<x>"&' } }));
++        expect(h).toContain('<title>&lt;x&gt;&quot;&amp;</title>');
++    });
++});
++
++describe('HtmlRenderer 背景色', () => {
++    it('.site-canvas と body の両方に bgColor を適用する', () => {
++        const h = render(base());
++        expect(h).toMatch(/\.site-canvas \{[^}]*background-color: #ffcc00/);
++        expect(h).toContain('<body style="margin: 0; background-color: #ffcc00;">');
++    });
++});
++
++const formScene = (extra = {}) => base({
++    elements: [
++        { id: 'ti1', type: 'TextInput', transform: { x: 0, y: 0, width: 200, height: 40 },
++          properties: { inputName: 'email', inputType: 'email', required: true, text: 'メール' } },
++        { id: 'ta1', type: 'TextInput', transform: { x: 0, y: 60, width: 200, height: 80 },
++          properties: { inputName: 'msg', inputType: 'textarea', text: '本文' } },
++        { id: 'b1', type: 'Button', transform: { x: 0, y: 160, width: 120, height: 40 },
++          properties: { text: '送信', role: 'submit', route: 'https://formspree.io/f/x', method: 'POST', ...extra } },
++        { id: 'b2', type: 'Button', transform: { x: 140, y: 160, width: 80, height: 40 },
++          properties: { text: '戻る', role: 'link', route: 'index.html' } },
++    ],
++});
++
++describe('HtmlRenderer フォーム', () => {
++    it('送信ボタンがあるとページを <form> でラップし、入力欄に name/type/required を出す', () => {
++        const h = render(formScene());
++        expect(h).toContain('<form action="https://formspree.io/f/x"');
++        expect(h).toContain('<button type="submit"');
++        expect(h).toContain('name="email"');
++        expect(h).toContain('type="email"');
++        expect(h).toContain('required');
++        expect(h).toContain('<textarea');
++        expect(h).toContain('name="msg"');
++    });
++
++    it('リンクボタンは <a> として出力され submit にならない', () => {
++        const h = render(formScene());
++        expect(h).toContain('href="index.html"');
++    });
++
++    it('既定では送信完了オーバーレイ（隠しiframe方式）を出力する', () => {
++        const h = render(formScene());
++        expect(h).toContain('id="ksb-form-success"');
++        expect(h).toContain('name="ksb_form_target"');
++        expect(h).toContain('送信ありがとうございました。');
++    });
++
++    it('完了メッセージが空なら遷移のみ（オーバーレイ/iframe なし）', () => {
++        const h = render(formScene({ successMessage: '' }));
++        expect(h).not.toContain('ksb-form-success');
++        expect(h).not.toContain('ksb_form_target');
++    });
++
++    it('Bladeモードでは @csrf と session(success) を出力する', () => {
++        const h = new HtmlRenderer({ ...formScene(), formAction: '/contact-submit' },
++            { mode: 'blade', imageMap: new Map() }).render();
++        expect(h).toContain('@csrf');
++        expect(h).toContain('action="/contact-submit"');
++        expect(h).toContain("@if(session('success'))");
++    });
++
++    it('送信ボタンが無ければ <form> を出さない', () => {
++        const h = render(base({ elements: [
++            { id: 'l', type: 'Label', transform: { x: 0, y: 0, width: 100, height: 20 }, properties: { text: 'hi' } },
++        ] }));
++        expect(h).not.toContain('<form');
++    });
++});
+-- 
+2.43.0
+

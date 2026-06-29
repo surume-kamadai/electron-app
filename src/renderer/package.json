@@ -1,6 +1,6 @@
 {
   "name": "laravel-gui-site-builder",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "GUIでデザインしてHTML/Laravel Bladeを生成するサイトビルダー",
   "main": "src/main/main.js",
   "scripts": {
@@ -8,13 +8,16 @@
     "dev": "electron . --dev",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac"
+    "build:mac": "electron-builder --mac",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "electron": "^31.0.0",
-    "electron-builder": "^24.13.0"
+    "electron-builder": "^24.13.0",
+    "vitest": "^2.1.9"
   },
   "build": {
     "appId": "com.example.site-builder",

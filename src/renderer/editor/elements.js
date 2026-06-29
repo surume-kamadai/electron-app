@@ -69,6 +69,8 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         bgimage:  '',
         // フォーム用: Button の役割（'link' | 'submit'）
         role:     type === 'Button' ? 'link' : 'none',
+        // フォーム送信ボタンの送信完了メッセージ（空なら遷移のみ）
+        successMessage: '送信ありがとうございました。',
         // フォーム用: TextInput の入力欄設定
         inputName: '',
         inputType: 'text',   // text | email | tel | number | textarea
@@ -158,7 +160,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             const img = new Image();
             img.crossOrigin = 'Anonymous';
             newNode = new Konva.Image({ ...base, image: img });
-            img.onload = () => layer.batchDraw();
+            img.onload = () => { applyImageCover(newNode); layer.batchDraw(); };
             img.onerror = () => {
                 console.warn('画像の読み込みに失敗しました。ダミーに差し替えます:', bData.text);
                 img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==';
@@ -518,6 +520,35 @@ export function spawnComponent(componentName) {
     saveHistory();
 }
 
+// 画像を枠サイズに「cover」フィットさせる（縦横比を保ったまま枠を埋める）。
+// Konva の crop を使い、出力の object-fit:cover と編集画面の見た目を一致させる。
+export function applyImageCover(node) {
+    if (!node || node.getAttr('uiType') !== 'Image') return;
+    const img = node.image();
+    if (!img || !img.width || !img.height) return;
+    // 表示サイズ（スケール込み）の縦横比に合わせる
+    const w = node.width() * node.scaleX();
+    const h = node.height() * node.scaleY();
+    if (w <= 0 || h <= 0) return;
+    const boxAR = w / h;
+    const imgAR = img.width / img.height;
+    let cw, ch, cx, cy;
+    if (imgAR > boxAR) {
+        // 画像が横長 → 左右を切り取る
+        ch = img.height;
+        cw = img.height * boxAR;
+        cx = (img.width - cw) / 2;
+        cy = 0;
+    } else {
+        // 画像が縦長 → 上下を切り取る
+        cw = img.width;
+        ch = img.width / boxAR;
+        cx = 0;
+        cy = (img.height - ch) / 2;
+    }
+    node.crop({ x: cx, y: cy, width: cw, height: ch });
+}
+
 export function applyTextStyle(node, bData) {
     if (!node) return;
     const type = node.getAttr('uiType');
@@ -578,6 +609,8 @@ export function syncNodeToLayout(node, device) {
         if (bg) { bg.width(l.w); bg.height(l.h); }
         if (bgImgNode) { bgImgNode.width(l.w); bgImgNode.height(l.h); }
         if (txt) { txt.width(l.w); txt.height(l.h); txt.fontSize(bData.fontsize); }
+    } else if (type === 'Image') {
+        applyImageCover(node);
     }
 
     if (type === 'Group') {

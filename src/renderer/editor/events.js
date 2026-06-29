@@ -4,8 +4,8 @@
 // ============================================================
 import { stage, layer, tr, selectionRect } from './canvas.js';
 import { selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode } from './state.js';
-import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes } from './elements.js';
-import { saveHistory, undo } from './history.js';
+import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover } from './elements.js';
+import { saveHistory, undo, redo } from './history.js';
 import { updateInspectorFromNode, deleteSelectedNode } from './inspector.js';
 import { renderExplorer } from './explorer.js';
 import { saveAndExport, importJSON, uploadImage } from './api.js';
@@ -27,6 +27,8 @@ stage.on('transformend dragend', (e) => {
 
     touched.forEach(node => {
         const type = node.getAttr('uiType');
+
+        if (type === 'Image') { applyImageCover(node); return; }
 
         if (type === 'Button') {
             const scaleX = node.scaleX();
@@ -474,7 +476,8 @@ window.addEventListener('keydown', e => {
     if      (e.key === 'Delete' || e.key === 'Backspace')         { deleteSelectedNode(); }
     else if (e.ctrlKey && (e.key === 'c' || e.key === 'C'))       { copySelected(); }
     else if (e.ctrlKey && (e.key === 'v' || e.key === 'V'))       { pasteClipboard(); }
-    else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z'))       { undo(); }
+    else if (e.ctrlKey && (e.key === 'y' || e.key === 'Y'))       { redo(); }
+    else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z'))       { e.shiftKey ? redo() : undo(); }
 });
 
 // ============================================================

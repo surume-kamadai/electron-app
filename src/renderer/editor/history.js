@@ -49,6 +49,15 @@ export function undo() {
     isUndoOperation = false;
 }
 
+export function redo() {
+    const hist = getCurrentHistory();
+    if (!hist || hist.index >= hist.states.length - 1) return;
+    hist.index++;
+    isUndoOperation = true;
+    loadFromState(JSON.parse(hist.states[hist.index]));
+    isUndoOperation = false;
+}
+
 function loadFromState(elementsData) {
     layer.find('.ui-element').forEach(n => n.destroy());
     setSelectedNodes([]);
