@@ -17,6 +17,52 @@ import { exitWarpMode, isWarpMode, getWarpTarget } from './warp.js';
 // ============================================================
 // ステージ: トランスフォーム完了時のグループスケール正規化
 // ============================================================
+
+// Label / Button のリサイズを「scale」から「width/height + fontSize」へ正規化する。
+// ドラッグ中(transform)に毎フレーム呼ぶことで、スケール操作中もリアルタイムに
+// 文字サイズが変わる。フォント倍率は縦横の大きい方に追従（どの方向でも変化）。
+function normalizeResize(node) {
+    const type = node.getAttr('uiType');
+    const sx = node.scaleX(), sy = node.scaleY();
+    if (sx === 1 && sy === 1) return;
+
+    // フォント倍率: どの方向のドラッグでも文字サイズが変わるよう、縦横の大きい方を使う
+    const fontFactor = Math.max(sx, sy);
+
+    if (type === 'Label') {
+        node.width(Math.max(5, node.width()  * sx));
+        node.height(Math.max(5, node.height() * sy));
+        node.scaleX(1); node.scaleY(1);
+        const newFont = Math.max(1, node.fontSize() * fontFactor);
+        node.fontSize(newFont);
+        const b = node.getAttr('bladeData'); if (b) b.fontsize = newFont;
+    } else if (type === 'Button') {
+        node.width(Math.max(5, node.width()  * sx));
+        node.height(Math.max(5, node.height() * sy));
+        node.scaleX(1); node.scaleY(1);
+        const bg  = node.findOne('.btn-bg');
+        const txt = node.findOne('.btn-text');
+        if (bg) { bg.width(node.width()); bg.height(node.height()); }
+        if (txt) {
+            txt.width(node.width()); txt.height(node.height());
+            const newFont = Math.max(1, txt.fontSize() * fontFactor);
+            txt.fontSize(newFont);
+            const b = node.getAttr('bladeData'); if (b) b.fontsize = newFont;
+        }
+    }
+}
+
+// ドラッグ中もリアルタイムに正規化（スケール操作中に文字サイズが追従して変わる）
+stage.on('transform', (e) => {
+    const node = e.target;
+    if (!node || !node.hasName || !node.hasName('ui-element')) return;
+    const t = node.getAttr('uiType');
+    if (t === 'Label' || t === 'Button') {
+        normalizeResize(node);
+        layer.batchDraw();
+    }
+});
+
 stage.on('transformend dragend', (e) => {
     // フック対象: 操作されたノード + 選択中のノード（複数選択ドラッグ対応）
     const touched = new Set();
@@ -30,21 +76,8 @@ stage.on('transformend dragend', (e) => {
 
         if (type === 'Image') { applyImageCover(node); return; }
 
-        if (type === 'Button') {
-            const scaleX = node.scaleX();
-            const scaleY = node.scaleY();
-            if (scaleX === 1 && scaleY === 1) return;
-
-            node.width(node.width()   * scaleX);
-            node.height(node.height() * scaleY);
-            node.scaleX(1);
-            node.scaleY(1);
-
-            const bg = node.findOne('.btn-bg');
-            const txt = node.findOne('.btn-text');
-            if (bg) { bg.width(node.width()); bg.height(node.height()); }
-            if (txt) { txt.width(node.width()); txt.height(node.height()); }
-        }
+        // Label / Button は width/height + fontSize へ正規化（文字を潰さない）
+        if (type === 'Label' || type === 'Button') { normalizeResize(node); return; }
 
         if (type !== 'Group') return;
         const scaleX = node.scaleX();

@@ -16,6 +16,7 @@ import { playPreview, stopPreview } from './editor/preview.js';
 import { renderPages, onAddPage, onAddFolder } from './editor/pages-ui.js';
 import { newProject, initProject, getPages, getFolders } from './editor/project.js';
 import { initDockLayout, showPanel, hidePanel } from './editor/dock-layout.js';
+import { initCanvasPreview } from './editor/canvas-preview.js';
 import {
     onProjectNameChange, onOutputTypeChange,
     onCanvasSizeChange, initSettingsUI,
@@ -158,6 +159,7 @@ function wireEditorButtons() {
 // golden-layoutの移植が終わったタイミングで配線（少し遅延）
 setTimeout(() => {
     wireEditorButtons();
+    initCanvasPreview();   // Slider/Grid/Accordion の実物プレビュー層を起動
     // モーダルを確実に body 直下へ移動（隠しコンテナ等に巻き込まれない保険）
     ['slider-editor-overlay', 'accordion-editor-overlay', 'preview-overlay'].forEach(id => {
         const el = document.getElementById(id);
