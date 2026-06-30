@@ -46,12 +46,12 @@ export function updateInspectorFromNode() {
 
     document.getElementById('ins-fields-single').style.display = 'block';
     document.getElementById('ins-fields-multi').style.display  = 'none';
-    document.getElementById('ins-opacity').value = bData.opacity ?? 1;
 
     const node  = selectedNodes[0];
     const bData = node.getAttr('bladeData');
     const type  = node.getAttr('uiType');
-
+    
+    document.getElementById('ins-opacity').value = bData.opacity ?? 1;
     document.getElementById('ins-name').value     = bData.name;
     document.getElementById('ins-x').value        = Math.round(node.x());
     document.getElementById('ins-y').value        = Math.round(node.y());
