@@ -71,6 +71,16 @@ function normalizeNode(node) {
         return;
     }
     if (type === 'Label' || type === 'Button') { normalizeResize(node); return; }
+    if (type === 'Triangle') {
+        // ハンドルでの拡大縮小(scale)を width/height に確定する（幅・高さが正しく反映される）
+        const sx = node.scaleX(), sy = node.scaleY();
+        if (sx !== 1 || sy !== 1) {
+            node.width(Math.max(5, node.width() * sx));
+            node.height(Math.max(5, node.height() * sy));
+            node.scaleX(1); node.scaleY(1);
+        }
+        return;
+    }
     if (type !== 'Group') return;
 
     const scaleX = node.scaleX();
@@ -127,7 +137,13 @@ stage.on('dragend', (e) => {
 // ============================================================
 // 【完全版】スマートスナップ（端・中央合わせ ＋ 等間隔配置）
 // ============================================================
-const SNAP_THRESHOLD = 6; 
+const SNAP_THRESHOLD = 6;
+
+// Alt キーを押している間はスナップを一時無効化（端や他要素に吸着させず微調整したい時用）
+let altHeld = false;
+window.addEventListener('keydown', e => { if (e.key === 'Alt') altHeld = true; });
+window.addEventListener('keyup',   e => { if (e.key === 'Alt') altHeld = false; });
+window.addEventListener('blur',    () => { altHeld = false; });
 
 let vGuide = document.getElementById('snap-v');
 if (!vGuide) {
@@ -152,6 +168,8 @@ if (!hGuide) {
 tr.boundBoxFunc((oldBox, newBox) => {
     // 最小サイズガード
     if (newBox.width < 12 || newBox.height < 12) return oldBox;
+    // Alt 押下中はスナップせず自由にリサイズ（微調整）
+    if (altHeld) { vGuide.style.display = 'none'; hGuide.style.display = 'none'; return newBox; }
     // 回転中はスナップしない
     if (newBox.rotation) { vGuide.style.display = 'none'; hGuide.style.display = 'none'; return newBox; }
 
@@ -200,6 +218,12 @@ tr.boundBoxFunc((oldBox, newBox) => {
 stage.on('dragmove', (e) => {
     const draggingNode = e.target;
     if (!draggingNode.hasName('ui-element') || selectedNodes.length > 1) return;
+    // Alt 押下中はスナップせず自由に移動（微調整）
+    if (altHeld || e.evt?.altKey) {
+        if (vGuide) vGuide.style.display = 'none';
+        if (hGuide) hGuide.style.display = 'none';
+        return;
+    }
 
     const zoom = stage.scaleX();
     let absMinX = draggingNode.x();
@@ -519,7 +543,11 @@ function startInlineTextEdit(node) {
 }
 
 document.getElementById('workspace').addEventListener('mousedown', e => {
-    if (e.target.closest('.floating-panel') || e.target.closest('.lm_content') || e.target.closest('#canvas-container') || e.target.closest('.context-menu')) return;
+    // 余白（ワークスペース／ペインやキャンバスの背景）を直接クリックした時だけ選択解除する。
+    // パネル・入力欄・golden-layout のスプリッタ/ヘッダ等を触った時は選択を維持
+    // （複数選択中にペイン境界やウィンドウをリサイズしても選択が外れないようにする）。
+    const bgIds = ['workspace', 'gl-root', 'canvas-area', 'canvas-wrapper'];
+    if (!bgIds.includes(e.target.id)) return;
     if (selectedNodes.length > 0) applySelectedNodes([]);
 });
 

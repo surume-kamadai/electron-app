@@ -25,9 +25,6 @@ export function processNode(node) {
     if (type === 'Circle') {
         x = Math.round(node.x() - node.radiusX());
         y = Math.round(node.y() - node.radiusY());
-    } else if (type === 'Triangle') {
-        x = Math.round(node.x() - node.radius());
-        y = Math.round(node.y() - node.radius());
     }
 
     const data = {
@@ -62,7 +59,6 @@ function collectAndRestore(node, snapshots) {
     // 今のスマホ表示中の位置を退避
     const snap = { node, x: node.x(), y: node.y(), w: node.width(), h: node.height() };
     if (type === 'Circle') { snap.rx = node.radiusX(); snap.ry = node.radiusY(); }
-    if (type === 'Triangle') { snap.r = node.radius(); }
     snapshots.push(snap);
 
     // PC配置の正データを探す: 起動直後の transform(=シーンデータ load 時の値) は
@@ -79,9 +75,6 @@ function collectAndRestore(node, snapshots) {
         const pc = bData._pcGeom;
         if (type === 'Circle') {
             node.radiusX(pc.w / 2); node.radiusY(pc.h / 2);
-            node.x(pc.x + pc.w / 2); node.y(pc.y + pc.h / 2);
-        } else if (type === 'Triangle') {
-            node.radius(Math.min(pc.w, pc.h) / 2);
             node.x(pc.x + pc.w / 2); node.y(pc.y + pc.h / 2);
         } else {
             node.x(pc.x); node.y(pc.y); node.width(pc.w); node.height(pc.h);
@@ -100,9 +93,6 @@ function restoreFromSnapshots(snapshots) {
         const type = s.node.getAttr('uiType');
         if (type === 'Circle') {
             s.node.radiusX(s.rx); s.node.radiusY(s.ry);
-            s.node.x(s.x); s.node.y(s.y);
-        } else if (type === 'Triangle') {
-            s.node.radius(s.r);
             s.node.x(s.x); s.node.y(s.y);
         } else {
             s.node.x(s.x); s.node.y(s.y); s.node.width(s.w); s.node.height(s.h);

@@ -316,7 +316,7 @@ render() {
             // width等を除いたベーススタイル
             let baseStyle = `position: absolute; box-sizing: border-box;`;
             // Group / ArticleGrid / Accordion は自前でレイアウトを組むので baseStyle に背景を付けない
-            if (type !== 'Group' && type !== 'ArticleGrid' && type !== 'Accordion') {
+            if (type !== 'Group' && type !== 'ArticleGrid' && type !== 'Accordion' && type !== 'Triangle') {
                 baseStyle += ` background-color: ${bgcolor}; color: ${color}; text-align: ${align}; font-family: ${fontfam};`;
                 if (type !== 'Button' && type !== 'Image') baseStyle += ` ${shadowStyle}`; 
             }
@@ -360,8 +360,8 @@ render() {
                     break;
                 }
                 case 'Triangle':
-                    const triStyle = `position: absolute; width: 100%; height: 100%; box-sizing: border-box; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); background-color: ${bgcolor};`;
-                    out += `${indent}<div id="${id}" class="${animClass}"><div style="${triStyle}"></div></div>\n`;
+                    const triStyle = `position: absolute; width: 100%; height: 100%; box-sizing: border-box; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); background-color: ${bgcolor};`;
+                    out += `${indent}<div id="${id}" class="${animClass}" style="${baseStyle}"><div style="${triStyle}"></div></div>\n`;
                     break;
                 case 'Image':
                     out += this.renderImage(id, animClass, baseStyle, props, name, shadowStyle, indent);

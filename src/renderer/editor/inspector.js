@@ -336,10 +336,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
         node.radiusY(parseInt(document.getElementById('ins-h').value) / 2);
     } else if (type === 'Triangle') {
         node.fill(bData.bgcolor);
-        node.radius(Math.min(
-            parseInt(document.getElementById('ins-w').value),
-            parseInt(document.getElementById('ins-h').value)
-        ) / 2);
+        // 幅・高さは上の node.width()/height() で設定済み（sceneFunc が箱に合わせて再描画）
     } else if (type === 'Image') {
         applyImageCover(node);
     }

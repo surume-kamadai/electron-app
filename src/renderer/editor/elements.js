@@ -159,7 +159,11 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             break;
         }
         case 'Circle':    newNode = new Konva.Ellipse({ ...base, radiusX: base.width / 2, radiusY: base.height / 2, x: base.x + base.width / 2, y: base.y + base.height / 2, fill: bData.bgcolor }); break;
-        case 'Triangle':  newNode = new Konva.RegularPolygon({ ...base, sides: 3, radius: Math.min(base.width, base.height) / 2, x: base.x + base.width / 2, y: base.y + base.height / 2, fill: bData.bgcolor }); break;
+        case 'Triangle':  newNode = new Konva.Shape({ ...base, fill: bData.bgcolor, sceneFunc(ctx, shape) {
+            const w = shape.width(), h = shape.height();
+            ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+            ctx.fillStrokeShape(shape);
+        } }); break;
         case 'Image': {
             const img = new Image();
             img.crossOrigin = 'Anonymous';
@@ -328,9 +332,6 @@ export function groupNodes() {
             if (type === 'Circle') {
                 nx = node.x() - node.radiusX(); ny = node.y() - node.radiusY();
                 nw = node.radiusX() * 2; nh = node.radiusY() * 2;
-            } else if (type === 'Triangle') {
-                const r = node.radius();
-                nx = node.x() - r; ny = node.y() - r; nw = r * 2; nh = r * 2;
             }
             bData._pcGeom = { x: nx, y: ny, w: nw, h: nh };
             // グループ化前のスマホ配置は無効になるのでクリア
@@ -372,9 +373,6 @@ export function ungroupNodes() {
             if (type === 'Circle') {
                 nx = child.x() - child.radiusX(); ny = child.y() - child.radiusY();
                 nw = child.radiusX() * 2; nh = child.radiusY() * 2;
-            } else if (type === 'Triangle') {
-                const r = child.radius();
-                nx = child.x() - r; ny = child.y() - r; nw = r * 2; nh = r * 2;
             }
             bData._pcGeom = { x: nx, y: ny, w: nw, h: nh };
             if (bData.layouts) delete bData.layouts.mobile;
@@ -597,10 +595,6 @@ export function syncNodeToLayout(node, device) {
     if (type === 'Circle') {
         node.radiusX(l.w / 2);
         node.radiusY(l.h / 2);
-        node.x(l.x + l.w / 2);
-        node.y(l.y + l.h / 2);
-    } else if (type === 'Triangle') {
-        node.radius(Math.min(l.w, l.h) / 2);
         node.x(l.x + l.w / 2);
         node.y(l.y + l.h / 2);
     } else {
