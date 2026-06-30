@@ -31,17 +31,24 @@ function resolveImageSrc(src, imageMap) {
     return src;
 }
 
+// シーンデータ（1ページ分: canvas/bgColor/seo/elements）を受け取り、
+// 完成したHTML文字列を生成するエンジン。
+//   - sceneData: { canvas, bgColor, seo, elements, formAction? }
+//   - options.mode: 'static'（素のHTML）/ 'blade'（Laravel Blade。@csrf や asset() を使う）
+//   - options.imageMap: data:URL画像 → 出力パスへの対応表
+// 生成方針: 各要素を絶対配置(%)で並べ、レスポンシブはCSSクラス + @media、
+//           動きのある部品(スライダー/アコーディオン/イベント)は dynamicJs に初期化JSを溜める。
 export class HtmlRenderer {
     constructor(sceneData, options = {}) {
         this.scene    = sceneData;
         this.mode     = options.mode || 'static';
         this.imageMap = options.imageMap || new Map();
-        
-        // ▼ 追加: レスポンシブ用CSSとイベント用JSを蓄積するバッファ
+
+        // レスポンシブ用CSS と 動的JS を描画中に溜めて、最後に <head>/<script> へ出力する
         this.dynamicCss = [];
         this.dynamicJs  = [];
-        this._mobileW = 375;
-        this._mobileCanvasH = 800;
+        this._mobileW = 375;          // スマホ表示の基準幅
+        this._mobileCanvasH = 800;    // スマホ表示の基準高さ
     }
 
 render() {
@@ -178,6 +185,10 @@ render() {
         return `<div id="ksb-form-success" style="display:none; ${style}">${inner}</div>`;
     }
 
+    // 要素配列を再帰的にHTML文字列へ変換する中核メソッド。
+    // - parentW/parentH: 親の基準サイズ（%座標の分母。トップレベルはキャンバスサイズ）
+    // - depth: ネスト深さ（インデント用）
+    // 各要素について「レスポンシブ用CSS(.el-id)」「イベントJS」「本体HTML」を生成する。
     renderElements(elements, parentW, parentH, depth) {
         let out = '';
         const indent = '    '.repeat(depth);
@@ -365,6 +376,7 @@ render() {
         return out;
     }
 
+    // グループ（入れ子コンテナ）。子要素を自身のサイズを基準に再帰描画する。
     renderGroup(id, animClass, baseStyle, bgcolor, el, width, height, depth, indent) {
         let out = `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background-color: ${bgcolor};">\n`;
         if (Array.isArray(el.children)) {
@@ -374,6 +386,8 @@ render() {
         return out;
     }
 
+    // ボタン。role==='submit' は <form> 送信ボタン、それ以外は <a> リンクとして出力。
+    // 背景画像があれば background-image、文字揃えは props.align を反映。
     renderButton(id, animClass, baseStyle, bgcolor, color, text, props, shadowStyle, indent) {
         let bgStyle = `background-color: ${bgcolor};`;
         if (props.bgimage) {
@@ -405,6 +419,7 @@ render() {
         return out;
     }
 
+    // 入力欄。inputName(name属性)・inputType(text/email/tel/number/textarea)・required を反映。
     renderTextInput(id, animClass, baseStyle, text, props, indent) {
         // フォーム項目として name / 種類 / 必須 を反映する
         const name      = escapeHtml(props.inputName || '');
@@ -425,16 +440,20 @@ render() {
         return `${indent}<div id="${id}" class="${animClass}" style="position:absolute;"><input type="${itype}"${nameAttr} placeholder="${ph}"${required} style="${style}"></div>\n`;
     }
 
+    // テキスト（見出し・本文）。単純な div として出力する。
     renderLabel(id, animClass, baseStyle, color, text, props, shadowStyle, indent) {
         const style = `${baseStyle} display: block; overflow: hidden; ${shadowStyle}`;
         return `${indent}<div id="${id}" class="${animClass}" style="${style}">${text}</div>\n`;
     }
 
+    // 画像。object-fit:contain で「拡大・切り取りせず全体表示」（縦横比維持）。
+    // route があればリンク化、画像は imageMap で data:URL → 出力パス
+    // （静的は images/...、Bladeは {{ asset(...) }}）へ解決。
     renderImage(id, animClass, baseStyle, props, name, shadowStyle, indent) {
         const src = escapeHtml(resolveImageSrc(props.text, this.imageMap));
         const route = props.route ?? '#';
         const hasLink = route !== '#' && route !== '' && route !== 'none';
-        const imgStyle = `width: 100%; height: 100%; object-fit: cover; display: block; ${shadowStyle}`;
+        const imgStyle = `width: 100%; height: 100%; object-fit: contain; display: block; ${shadowStyle}`;
 
         if (hasLink) {
             const url = escapeHtml(route);
@@ -448,6 +467,8 @@ render() {
 
         return `${indent}<img id="${id}" src="${src}" alt="${name}" class="${animClass}" style="${baseStyle} ${imgStyle}">\n`;
     }
+    // 画像スライダー。Swiper.js のマークアップを生成し、初期化JSを dynamicJs に積む。
+    // slides[]（画像/タイトル/本文/リンク）と各種オプション（効果/速度/自動再生等）に対応。
     renderSlider(id, animClass, baseStyle, props, indent) {
         // 新スキーマ slides[] 優先、無ければ旧 text(カンマ区切り画像URL)から変換
         let slides = props.slider?.slides;
@@ -552,6 +573,8 @@ render() {
         return out;
     }
 
+    // 記事グリッド。CSSグリッドでカードを並べる。sliderMode の場合は Swiper で横スクロール。
+    // 768px以下は1カラムに自動で折り返す（レスポンシブ）。
     renderArticleGrid(id, animClass, baseStyle, props, indent) {
         const g = props.grid || {};
         const items      = Array.isArray(g.items) ? g.items : [];
@@ -662,6 +685,7 @@ render() {
         return out;
     }
 
+    // アコーディオン（開閉Q&A）。各項目のヘッダー/本文を出力し、開閉JSを dynamicJs に積む。
     renderAccordion(id, animClass, baseStyle, props, indent) {
         const a = props.accordion || {};
         const items = Array.isArray(a.items) ? a.items : [];
