@@ -31,6 +31,18 @@ function resolveImageSrc(src, imageMap) {
     return src;
 }
 
+// 背景の CSS 宣言を返す。グラデーション on なら background:gradient、それ以外は単色。
+function gradientBgDecl(props, bgcolorEscaped) {
+    const g = props.gradient;
+    if (g && g.on) {
+        const c1 = escapeHtml(g.c1 || '#4facfe'), c2 = escapeHtml(g.c2 || '#00f2fe');
+        if (g.type === 'radial') return `background: radial-gradient(circle, ${c1}, ${c2});`;
+        const DEG = { v: 180, h: 90, d1: 135, d2: 225 };
+        return `background: linear-gradient(${DEG[g.dir] ?? 180}deg, ${c1}, ${c2});`;
+    }
+    return `background-color: ${bgcolorEscaped};`;
+}
+
 // シーンデータ（1ページ分: canvas/bgColor/seo/elements）を受け取り、
 // 完成したHTML文字列を生成するエンジン。
 //   - sceneData: { canvas, bgColor, seo, elements, formAction? }
@@ -290,6 +302,7 @@ render() {
             const text     = escapeHtml(props.text ?? '');
             const name     = escapeHtml(props.name ?? 'Unnamed');
             const bgcolor  = escapeHtml(props.bgcolor ?? 'transparent');
+            const bgFill   = gradientBgDecl(props, bgcolor);
             const color    = escapeHtml(props.color ?? 'inherit');
             const align    = escapeHtml(props.align || (type === 'Button' ? 'center' : 'left'));
             const fontfam  = escapeHtml(props.fontfamily || 'sans-serif');
@@ -317,7 +330,7 @@ render() {
             let baseStyle = `position: absolute; box-sizing: border-box;`;
             // Group / ArticleGrid / Accordion は自前でレイアウトを組むので baseStyle に背景を付けない
             if (type !== 'Group' && type !== 'ArticleGrid' && type !== 'Accordion' && type !== 'Triangle') {
-                baseStyle += ` background-color: ${bgcolor}; color: ${color}; text-align: ${align}; font-family: ${fontfam};`;
+                baseStyle += ` ${bgFill} color: ${color}; text-align: ${align}; font-family: ${fontfam};`;
                 if (type !== 'Button' && type !== 'Image') baseStyle += ` ${shadowStyle}`; 
             }
 
@@ -360,7 +373,7 @@ render() {
                     break;
                 }
                 case 'Triangle':
-                    const triStyle = `position: absolute; width: 100%; height: 100%; box-sizing: border-box; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); background-color: ${bgcolor};`;
+                    const triStyle = `position: absolute; width: 100%; height: 100%; box-sizing: border-box; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); ${bgFill}`;
                     out += `${indent}<div id="${id}" class="${animClass}" style="${baseStyle}"><div style="${triStyle}"></div></div>\n`;
                     break;
                 case 'Image':
@@ -393,7 +406,7 @@ render() {
     // ボタン。role==='submit' は <form> 送信ボタン、それ以外は <a> リンクとして出力。
     // 背景画像があれば background-image、文字揃えは props.align を反映。
     renderButton(id, animClass, baseStyle, bgcolor, color, text, props, shadowStyle, indent) {
-        let bgStyle = `background-color: ${bgcolor};`;
+        let bgStyle = gradientBgDecl(props, bgcolor);
         if (props.bgimage) {
             const src = escapeHtml(resolveImageSrc(props.bgimage, this.imageMap));
             bgStyle = `background-image: url('${src}'); background-size: cover; background-position: center;`;
@@ -458,15 +471,21 @@ render() {
         const route = props.route ?? '#';
         const hasLink = route !== '#' && route !== '' && route !== 'none';
         const imgStyle = `width: 100%; height: 100%; object-fit: contain; display: block; ${shadowStyle}`;
+        const g = props.gradient;
+        // グラデーション on の画像は、画像の上に gradient を乗算で重ねるオーバーレイを置く
+        const overlay = (g && g.on)
+            ? `<div style="position:absolute; inset:0; ${gradientBgDecl(props, '')} mix-blend-mode:multiply; pointer-events:none;"></div>`
+            : '';
 
         if (hasLink) {
             const url = escapeHtml(route);
-            let out = `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background:none;">\n`;
-            out += `${indent}    <a href="${url}" style="display:block; width:100%; height:100%;">\n`;
-            out += `${indent}        <img src="${src}" alt="${name}" style="${imgStyle}">\n`;
-            out += `${indent}    </a>\n`;
-            out += `${indent}</div>\n`;
-            return out;
+            let inner = `<img src="${src}" alt="${name}" style="${imgStyle}">`;
+            inner = `<a href="${url}" style="display:block; width:100%; height:100%;">${inner}</a>`;
+            return `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background:none; overflow:hidden;">${inner}${overlay}</div>\n`;
+        }
+
+        if (overlay) {
+            return `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} overflow:hidden;"><img src="${src}" alt="${name}" style="${imgStyle}">${overlay}</div>\n`;
         }
 
         return `${indent}<img id="${id}" src="${src}" alt="${name}" class="${animClass}" style="${baseStyle} ${imgStyle}">\n`;

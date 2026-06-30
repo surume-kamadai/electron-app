@@ -276,6 +276,41 @@
                         <label>不透明度（透明度）</label>
                         <input type="range" id="ins-opacity" min="0" max="1" step="0.05" value="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
                     </div>
+
+                    <div id="group-gradient" style="display:none; border-top:1px solid #444; padding-top:8px; margin-top:6px;">
+                        <label><input type="checkbox" id="ins-grad-on" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 🎨 グラデーション</label>
+                        <div id="grad-fields" style="display:none; margin-top:5px;">
+                            <div class="row">
+                                <div class="form-group">
+                                    <label>種類</label>
+                                    <select id="ins-grad-type" onchange="onInspectorUpdate(true)">
+                                        <option value="linear">線形</option>
+                                        <option value="radial">放射状（中央→端）</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="grad-dir-wrap">
+                                    <label>方向</label>
+                                    <select id="ins-grad-dir" onchange="onInspectorUpdate(true)">
+                                        <option value="v">上 → 下</option>
+                                        <option value="h">左 → 右</option>
+                                        <option value="d1">左上 → 右下</option>
+                                        <option value="d2">右上 → 左下</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="form-group">
+                                    <label>色1（開始 / 中央）</label>
+                                    <input type="color" id="ins-grad-c1" value="#4facfe" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                                <div class="form-group">
+                                    <label>色2（終了 / 端）</label>
+                                    <input type="color" id="ins-grad-c2" value="#00f2fe" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                            </div>
+                            <div style="font-size:10px; color:#888;">画像はグラデーションを上から重ねます（乗算）</div>
+                        </div>
+                    </div>
 <div class="form-group">
                         <label>フォントサイズ</label>
                         <input type="number" id="ins-fontsize" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">

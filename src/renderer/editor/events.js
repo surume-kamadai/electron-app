@@ -4,7 +4,7 @@
 // ============================================================
 import { stage, layer, tr, selectionRect } from './canvas.js';
 import { selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
-import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover } from './elements.js';
+import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient } from './elements.js';
 import { saveHistory, undo, redo } from './history.js';
 import { updateInspectorFromNode, deleteSelectedNode } from './inspector.js';
 import { renderExplorer } from './explorer.js';
@@ -112,6 +112,8 @@ function normalizeNode(node) {
 // 変形/移動の完了処理（正規化→インスペクタ更新→履歴保存）
 function finalizeAfterTransform(nodes) {
     nodes.forEach(normalizeNode);
+    // サイズが変わったのでグラデーションの起点/終点を再計算
+    nodes.forEach(n => applyGradient(n, n.getAttr('bladeData')));
     updateInspectorFromNode();
     renderExplorer();
     layer.batchDraw();
