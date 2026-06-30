@@ -57,7 +57,6 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         text:     type === 'Image' ? 'https://placehold.co/150x150/png' : 'テキスト',
         bgcolor:  DEFAULT_PROPS[type]?.bgcolor  ?? '#ffffff',
         color:    '#000000',
-        opacity: 1,
         fontsize: 16,
         align:    'left',
         fontfamily:'sans-serif',
@@ -67,6 +66,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         event:    DEFAULT_PROPS[type]?.event ?? 'none',
         shadow:   'none',
         animation:'none',
+        opacity:  1,
         bgimage:  '',
         // フォーム用: Button の役割（'link' | 'submit'）
         role:     type === 'Button' ? 'link' : 'none',
@@ -258,15 +258,17 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
 
     applyNodeShadow(newNode, bData.shadow);
 
+    // 保存済みの不透明度を読み込み時にKonvaノードへ反映（既定は1=不透明）
+    if (typeof bData.opacity === 'number' && Number.isFinite(bData.opacity)) {
+        newNode.opacity(Math.min(1, Math.max(0, bData.opacity)));
+    }
+
     newNode.on('dragend transformend', () => {
         updateInspectorFromNode();
         renderExplorer();
         saveHistory();
     });
 
-    if (bData.opacity !== undefined) {
-        newNode.opacity(bData.opacity);
-    }
     parentGroup.add(newNode);
 
     if (!loadData && !isHistoryLoad) {

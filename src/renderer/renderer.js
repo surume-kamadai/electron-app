@@ -237,7 +237,11 @@ render() {
             const heightRule = (type === 'ArticleGrid' || type === 'Accordion')
                 ? `height: auto; min-height: ${hPc}%`
                 : `height: ${hPc}%`;
-            let cssRule = `.${className} { left: ${leftPc}%; top: ${topPc}%; width: ${wPc}%; ${heightRule}; font-size: ${fontPc}px; transition: all 0.3s ease; }`;
+            // 不透明度（0〜1）。既定1のときは出力しない（アニメーションのopacityと競合させないため）。
+            const opacity = (typeof props.opacity === 'number' && Number.isFinite(props.opacity))
+                ? Math.min(1, Math.max(0, props.opacity)) : 1;
+            const opacityRule = opacity !== 1 ? ` opacity: ${opacity};` : '';
+            let cssRule = `.${className} { left: ${leftPc}%; top: ${topPc}%; width: ${wPc}%; ${heightRule}; font-size: ${fontPc}px;${opacityRule} transition: all 0.3s ease; }`;
 
             // スマホ: font-size を vw 基準にして、画面幅に応じて文字も拡縮させる
             const fontMoVw = (fontMo / this._mobileW * 100).toFixed(2);
@@ -311,9 +315,6 @@ render() {
 
             // width等を除いたベーススタイル
             let baseStyle = `position: absolute; box-sizing: border-box;`;
-            if (props.opacity !== undefined && props.opacity < 1) {
-                baseStyle += ` opacity: ${props.opacity};`;
-            }
             // Group / ArticleGrid / Accordion は自前でレイアウトを組むので baseStyle に背景を付けない
             if (type !== 'Group' && type !== 'ArticleGrid' && type !== 'Accordion') {
                 baseStyle += ` background-color: ${bgcolor}; color: ${color}; text-align: ${align}; font-family: ${fontfam};`;
@@ -468,10 +469,7 @@ render() {
             return out;
         }
 
-    let out = `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background:none;">\n`;
-        out += `${indent}    <img src="${src}" alt="${name}" style="${imgStyle}">\n`;
-        out += `${indent}</div>\n`;
-        return out;    
+        return `${indent}<img id="${id}" src="${src}" alt="${name}" class="${animClass}" style="${baseStyle} ${imgStyle}">\n`;
     }
     // 画像スライダー。Swiper.js のマークアップを生成し、初期化JSを dynamicJs に積む。
     // slides[]（画像/タイトル/本文/リンク）と各種オプション（効果/速度/自動再生等）に対応。
