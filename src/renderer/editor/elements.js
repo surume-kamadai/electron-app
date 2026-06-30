@@ -160,7 +160,11 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             const img = new Image();
             img.crossOrigin = 'Anonymous';
             newNode = new Konva.Image({ ...base, image: img });
-            img.onload = () => { applyImageCover(newNode); layer.batchDraw(); };
+            // 画像読込後にアスペクト調整。万一失敗しても描画は止めない（画像が出なくならないように）
+            img.onload = () => {
+                try { applyImageCover(newNode); } catch (err) { console.error('[applyImageCover]', err); }
+                layer.batchDraw();
+            };
             img.onerror = () => {
                 console.warn('画像の読み込みに失敗しました。ダミーに差し替えます:', bData.text);
                 img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==';
@@ -530,33 +534,20 @@ export function spawnComponent(componentName) {
     saveHistory();
 }
 
-// 画像を枠サイズに「cover」フィットさせる（縦横比を保ったまま枠を埋める）。
-// Konva の crop を使い、出力の object-fit:cover と編集画面の見た目を一致させる。
+// 画像を「拡大・切り取りせず、縦横比を保って全体表示」する。
+// 以前は cover(crop) で枠を埋めていたが画像が拡大表示されてしまうため、
+// クロップを解除し、高さを幅に対する画像の比率へ合わせて歪み・拡大を防ぐ。
+// （幅を基準に高さが追従＝アスペクト固定。これで拡大も歪みも起きない）
 export function applyImageCover(node) {
     if (!node || node.getAttr('uiType') !== 'Image') return;
     const img = node.image();
     if (!img || !img.width || !img.height) return;
-    // 表示サイズ（スケール込み）の縦横比に合わせる
-    const w = node.width() * node.scaleX();
-    const h = node.height() * node.scaleY();
-    if (w <= 0 || h <= 0) return;
-    const boxAR = w / h;
-    const imgAR = img.width / img.height;
-    let cw, ch, cx, cy;
-    if (imgAR > boxAR) {
-        // 画像が横長 → 左右を切り取る
-        ch = img.height;
-        cw = img.height * boxAR;
-        cx = (img.width - cw) / 2;
-        cy = 0;
-    } else {
-        // 画像が縦長 → 上下を切り取る
-        cw = img.width;
-        ch = img.width / boxAR;
-        cx = 0;
-        cy = (img.height - ch) / 2;
+    // クロップ解除＝画像全体を指す crop にする（null を渡すと Konva が例外を投げるため）
+    node.crop({ x: 0, y: 0, width: img.width, height: img.height });
+    const w = node.width();
+    if (w > 0) {
+        node.height(Math.max(1, Math.round(w * img.height / img.width)));
     }
-    node.crop({ x: cx, y: cy, width: cw, height: ch });
 }
 
 export function applyTextStyle(node, bData) {

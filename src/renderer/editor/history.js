@@ -30,8 +30,14 @@ export function saveHistory() {
     if (!hist) return;
 
     const currentState = generateSceneData(false).elements;
+    const json = JSON.stringify(currentState);
+
+    // 直前と同じ状態は積まない（1操作で saveHistory が二重に呼ばれても
+    // 履歴が重複せず、Ctrl+Z が2手戻ってしまうのを防ぐ）
+    if (hist.index >= 0 && hist.states[hist.index] === json) return;
+
     hist.states = hist.states.slice(0, hist.index + 1);
-    hist.states.push(JSON.stringify(currentState));
+    hist.states.push(json);
 
     if (hist.states.length > HISTORY_LIMIT) {
         hist.states.shift();

@@ -3,7 +3,7 @@
 // ステージ操作 / キーボード / パネルドラッグ / 画像D&D / 右クリック
 // ============================================================
 import { stage, layer, tr, selectionRect } from './canvas.js';
-import { selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode } from './state.js';
+import { selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
 import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover } from './elements.js';
 import { saveHistory, undo, redo } from './history.js';
 import { updateInspectorFromNode, deleteSelectedNode } from './inspector.js';
@@ -52,27 +52,24 @@ function normalizeResize(node) {
     }
 }
 
-// ドラッグ中もリアルタイムに正規化（スケール操作中に文字サイズが追従して変わる）。
-// transform イベントは stage に届かない場合があるため、Transformer 自身にも直接
-// フックし、対象は tr.nodes()（選択中のノード）から取得して確実に処理する。
-function liveNormalizeSelection() {
-    let any = false;
-    tr.nodes().forEach(node => {
-        const t = node.getAttr && node.getAttr('uiType');
-        if ((t === 'Label' || t === 'Button') && (node.scaleX() !== 1 || node.scaleY() !== 1)) {
-            normalizeResize(node);
-            any = true;
-        }
-    });
-    if (any) layer.batchDraw();
-}
-tr.on('transform', liveNormalizeSelection);
-stage.on('transform', liveNormalizeSelection);
+// ※ ドラッグ中のリアルタイム正規化は、Transformer の内部計算と干渉して
+//    フォント倍率が累積・巨大化するため行わない。整形は完了時(transformend)に
+//    一度だけ行う（下の tr.on('transformend')）。
 
 // 1ノードのスケールを width/height(+font) に正規化する（Image はカバー再計算）
 function normalizeNode(node) {
     const type = node.getAttr('uiType');
-    if (type === 'Image') { applyImageCover(node); return; }
+    if (type === 'Image') {
+        // スケールを width/height に確定してから、アスペクト維持で表示を整える
+        const sx = node.scaleX(), sy = node.scaleY();
+        if (sx !== 1 || sy !== 1) {
+            node.width(node.width() * sx);
+            node.height(node.height() * sy);
+            node.scaleX(1); node.scaleY(1);
+        }
+        applyImageCover(node);
+        return;
+    }
     if (type === 'Label' || type === 'Button') { normalizeResize(node); return; }
     if (type !== 'Group') return;
 
@@ -114,6 +111,8 @@ function finalizeAfterTransform(nodes) {
 
 // リサイズ完了（Transformer のイベントを直接使う＝stageに届かない環境でも確実）
 tr.on('transformend', () => {
+    if (vGuide) vGuide.style.display = 'none';
+    if (hGuide) hGuide.style.display = 'none';
     finalizeAfterTransform(tr.nodes());
 });
 
@@ -144,6 +143,59 @@ if (!hGuide) {
     hGuide.className = 'snap-guideline horizontal';
     document.getElementById('canvas-wrapper').appendChild(hGuide);
 }
+
+// ============================================================
+// リサイズ時のスナップ（boundBoxFunc）
+// ドラッグしている辺を、他要素の端・キャンバス端・ガイドに吸着させる。
+// 変形パイプライン内で完結するため、変形ループと干渉しない（安定）。
+// ============================================================
+tr.boundBoxFunc((oldBox, newBox) => {
+    // 最小サイズガード
+    if (newBox.width < 12 || newBox.height < 12) return oldBox;
+    // 回転中はスナップしない
+    if (newBox.rotation) { vGuide.style.display = 'none'; hGuide.style.display = 'none'; return newBox; }
+
+    const zoom = stage.scaleX() || 1;
+    const active = (typeof tr.getActiveAnchor === 'function') ? (tr.getActiveAnchor() || '') : '';
+
+    // 吸着候補（要素座標）: キャンバス端 + 他要素の端 + ガイド
+    const xs = [0, currentCanvasWidth];
+    const ys = [0, currentCanvasHeight];
+    const sel = tr.nodes();
+    layer.getChildren().forEach(n => {
+        if (!n.hasName('ui-element') || sel.includes(n) || n.visible() === false) return;
+        const b = n.getClientRect({ relativeTo: layer });
+        xs.push(b.x, b.x + b.width);
+        ys.push(b.y, b.y + b.height);
+    });
+    if (typeof window.__getGuideXs === 'function') window.__getGuideXs().forEach(v => xs.push(v));
+    if (typeof window.__getGuideYs === 'function') window.__getGuideYs().forEach(v => ys.push(v));
+
+    // newBox は stage(スケール済み)座標 → 要素座標へ
+    let left = newBox.x / zoom, top = newBox.y / zoom;
+    let right = (newBox.x + newBox.width) / zoom, bottom = (newBox.y + newBox.height) / zoom;
+
+    const nearest = (val, cands) => {
+        let best = null, bd = SNAP_THRESHOLD;
+        for (const c of cands) { const d = Math.abs(val - c); if (d < bd) { bd = d; best = c; } }
+        return best;
+    };
+
+    let snapX = null, snapY = null;
+    // 動いている辺だけ吸着する
+    if (active.includes('left'))   { const s = nearest(left,   xs); if (s !== null) { left = s;   snapX = s; } }
+    if (active.includes('right'))  { const s = nearest(right,  xs); if (s !== null) { right = s;  snapX = s; } }
+    if (active.includes('top'))    { const s = nearest(top,    ys); if (s !== null) { top = s;    snapY = s; } }
+    if (active.includes('bottom')) { const s = nearest(bottom, ys); if (s !== null) { bottom = s; snapY = s; } }
+
+    // ガイド線の表示
+    if (snapX !== null) { vGuide.style.display = 'block'; vGuide.style.left = (snapX * zoom) + 'px'; } else vGuide.style.display = 'none';
+    if (snapY !== null) { hGuide.style.display = 'block'; hGuide.style.top  = (snapY * zoom) + 'px'; } else hGuide.style.display = 'none';
+
+    const nb = { ...newBox, x: left * zoom, y: top * zoom, width: (right - left) * zoom, height: (bottom - top) * zoom };
+    if (nb.width < 12 || nb.height < 12) return oldBox;
+    return nb;
+});
 
 stage.on('dragmove', (e) => {
     const draggingNode = e.target;
