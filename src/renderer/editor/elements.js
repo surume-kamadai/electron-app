@@ -57,6 +57,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         text:     type === 'Image' ? 'https://placehold.co/150x150/png' : 'テキスト',
         bgcolor:  DEFAULT_PROPS[type]?.bgcolor  ?? '#ffffff',
         color:    '#000000',
+        opacity: 1,
         fontsize: 16,
         align:    'left',
         fontfamily:'sans-serif',
@@ -263,6 +264,9 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         saveHistory();
     });
 
+    if (bData.opacity !== undefined) {
+        newNode.opacity(bData.opacity);
+    }
     parentGroup.add(newNode);
 
     if (!loadData && !isHistoryLoad) {

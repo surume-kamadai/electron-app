@@ -19,8 +19,8 @@ import { exitWarpMode, isWarpMode, getWarpTarget } from './warp.js';
 // ============================================================
 
 // Label / Button のリサイズを「scale」から「width/height + fontSize」へ正規化する。
-// ドラッグ中(transform)に毎フレーム呼ぶことで、スケール操作中もリアルタイムに
-// 文字サイズが変わる。フォント倍率は縦横の大きい方に追従（どの方向でも変化）。
+// リサイズ完了時(transformend)に最終スケールで一度だけ呼ぶ（ドラッグ中の毎フレーム
+// 処理は累積で巨大化するため行わない）。フォント倍率は縦横の大きい方に追従。
 function normalizeResize(node) {
     const type = node.getAttr('uiType');
     const sx = node.scaleX(), sy = node.scaleY();
@@ -574,11 +574,19 @@ window.addEventListener('keydown', e => {
 // ============================================================
 // 画像のドラッグ＆ドロップ追加
 // ============================================================
-document.getElementById('workspace').addEventListener('dragover', e => e.preventDefault());
+// dragenter/dragover で preventDefault + dropEffect='copy' を設定しないと、
+// ブラウザがドロップを拒否して「🚫 ストップマーク」が出てしまう。
+['dragenter', 'dragover'].forEach(type => {
+    document.getElementById('workspace').addEventListener(type, e => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    });
+});
 document.getElementById('workspace').addEventListener('drop', async e => {
     e.preventDefault();
+    e.stopPropagation();
     const file = e.dataTransfer.files?.[0];
-    if (!file?.type.startsWith('image/')) return;
+    if (!file || !file.type.startsWith('image/')) return;
 
     const imageUrl = await uploadImage(file);
     if (!imageUrl) return;

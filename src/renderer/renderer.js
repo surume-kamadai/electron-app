@@ -311,6 +311,9 @@ render() {
 
             // width等を除いたベーススタイル
             let baseStyle = `position: absolute; box-sizing: border-box;`;
+            if (props.opacity !== undefined && props.opacity < 1) {
+                baseStyle += ` opacity: ${props.opacity};`;
+            }
             // Group / ArticleGrid / Accordion は自前でレイアウトを組むので baseStyle に背景を付けない
             if (type !== 'Group' && type !== 'ArticleGrid' && type !== 'Accordion') {
                 baseStyle += ` background-color: ${bgcolor}; color: ${color}; text-align: ${align}; font-family: ${fontfam};`;
@@ -465,7 +468,10 @@ render() {
             return out;
         }
 
-        return `${indent}<img id="${id}" src="${src}" alt="${name}" class="${animClass}" style="${baseStyle} ${imgStyle}">\n`;
+    let out = `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background:none;">\n`;
+        out += `${indent}    <img src="${src}" alt="${name}" style="${imgStyle}">\n`;
+        out += `${indent}</div>\n`;
+        return out;    
     }
     // 画像スライダー。Swiper.js のマークアップを生成し、初期化JSを dynamicJs に積む。
     // slides[]（画像/タイトル/本文/リンク）と各種オプション（効果/速度/自動再生等）に対応。
