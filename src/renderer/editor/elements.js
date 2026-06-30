@@ -81,7 +81,10 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         events:   loadData && loadData.properties.events ? loadData.properties.events : []
     };
 
-    const tData = loadData ? loadData.transform : { x: 50, y: 50, width: 150, height: 50 };
+    // 丸・三角は初期から正方形にして、潰れた楕円/平たい三角にならないようにする
+    const squareDefault = (type === 'Circle' || type === 'Triangle');
+    const tData = loadData ? loadData.transform
+        : { x: 50, y: 50, width: squareDefault ? 120 : 150, height: squareDefault ? 120 : 50 };
     const base  = { x: tData.x, y: tData.y, width: tData.width, height: tData.height, draggable: true, name: 'ui-element', id };
 
     // 【重要】_pcGeom を必ず初期化する。これでスマホ表示中の出力時にPC位置が壊れない。

@@ -828,6 +828,24 @@ export function alignNodes(alignType) {
     saveHistory();
 }
 
+// 複数選択した要素を、指定間隔(px)で横/縦に等間隔配置する
+export function distributeNodes(axis) {
+    if (selectedNodes.length < 2) return;
+    const gap = parseInt(document.getElementById('ins-multi-gap')?.value) || 0;
+    const sorted = [...selectedNodes].sort((a, b) => (axis === 'x' ? a.x() - b.x() : a.y() - b.y()));
+    let cursor = axis === 'x' ? sorted[0].x() : sorted[0].y();
+    sorted.forEach(node => {
+        if (axis === 'x') { node.x(cursor); cursor += node.width()  + gap; }
+        else              { node.y(cursor); cursor += node.height() + gap; }
+        const bData = node.getAttr('bladeData');
+        if (bData) node.setAttr('bladeData', bData);
+    });
+    tr.forceUpdate();
+    layer.batchDraw();
+    renderExplorer();
+    saveHistory();
+}
+
 // ============================================================
 // ⚡ インタラクション (イベントトリガー) の管理
 // ============================================================
