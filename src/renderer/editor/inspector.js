@@ -50,7 +50,8 @@ export function updateInspectorFromNode() {
     const node  = selectedNodes[0];
     const bData = node.getAttr('bladeData');
     const type  = node.getAttr('uiType');
-
+    
+    document.getElementById('ins-opacity').value = bData.opacity ?? 1;
     document.getElementById('ins-name').value     = bData.name;
     document.getElementById('ins-x').value        = Math.round(node.x());
     document.getElementById('ins-y').value        = Math.round(node.y());
@@ -192,7 +193,8 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
     bData.text     = document.getElementById('ins-text').value;
     bData.bgcolor  = document.getElementById('ins-bgcolor').value;
     bData.color    = document.getElementById('ins-color').value;
-
+    bData.opacity = parseFloat(document.getElementById('ins-opacity').value) ?? 1;
+    node.opacity(bData.opacity); // Konvaノードに透明度を適用
     const newFontsize = parseInt(document.getElementById('ins-fontsize').value) || 16;
     // フォントサイズはデバイスごとに分離: PCはbData.fontsize、スマホは layouts.mobile.fontsize
     if (currentDevice === 'mobile') {
