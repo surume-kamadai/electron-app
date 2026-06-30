@@ -2,7 +2,7 @@
 // main-renderer.js - エディタ画面のエントリーポイント（マルチページ版）
 // ============================================================
 import { spawnElement, groupNodes, ungroupNodes, createEmptyFolder,spawnComponent } from './editor/elements.js';
-import { onInspectorUpdate, deleteSelectedNode, alignNodes } from './editor/inspector.js';
+import { onInspectorUpdate, deleteSelectedNode, alignNodes, distributeNodes } from './editor/inspector.js';
 import { saveAndExport, importJSON, startAutoSave } from './editor/api.js';
 import { renderExplorer } from './editor/explorer.js';
 import { saveHistory, clearPageHistory, undo, redo } from './editor/history.js';
@@ -45,6 +45,7 @@ window.stopPreview  = stopPreview;
 window.toggleRulers = toggleRulers;
 window.updateCanvasSize   = onCanvasSizeChange;
 window.alignNodes         = alignNodes;
+window.distributeNodes    = distributeNodes;
 
 // --- プロジェクト設定 ---
 window.onProjectNameChange = onProjectNameChange;

@@ -156,9 +156,6 @@ function getNodeGeometry(node) {
     if (type === 'Circle') {
         const rx = node.radiusX(), ry = node.radiusY();
         return { x: node.x() - rx, y: node.y() - ry, w: rx * 2, h: ry * 2 };
-    } else if (type === 'Triangle') {
-        const r = node.radius();
-        return { x: node.x() - r, y: node.y() - r, w: r * 2, h: r * 2 };
     }
     return { x: node.x(), y: node.y(), w: node.width(), h: node.height() };
 }
@@ -208,9 +205,6 @@ function restoreFromPcGeomRecursive(node) {
         const type = node.getAttr('uiType');
         if (type === 'Circle') {
             node.radiusX(pc.w / 2); node.radiusY(pc.h / 2);
-            node.x(pc.x + pc.w / 2); node.y(pc.y + pc.h / 2);
-        } else if (type === 'Triangle') {
-            node.radius(Math.min(pc.w, pc.h) / 2);
             node.x(pc.x + pc.w / 2); node.y(pc.y + pc.h / 2);
         } else {
             node.x(pc.x); node.y(pc.y); node.width(pc.w); node.height(pc.h);

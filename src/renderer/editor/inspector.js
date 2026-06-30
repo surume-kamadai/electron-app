@@ -336,10 +336,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
         node.radiusY(parseInt(document.getElementById('ins-h').value) / 2);
     } else if (type === 'Triangle') {
         node.fill(bData.bgcolor);
-        node.radius(Math.min(
-            parseInt(document.getElementById('ins-w').value),
-            parseInt(document.getElementById('ins-h').value)
-        ) / 2);
+        // 幅・高さは上の node.width()/height() で設定済み（sceneFunc が箱に合わせて再描画）
     } else if (type === 'Image') {
         applyImageCover(node);
     }
@@ -822,6 +819,24 @@ export function alignNodes(alignType) {
         if (bData) node.setAttr('bladeData', bData);
     });
 
+    tr.forceUpdate();
+    layer.batchDraw();
+    renderExplorer();
+    saveHistory();
+}
+
+// 複数選択した要素を、指定間隔(px)で横/縦に等間隔配置する
+export function distributeNodes(axis) {
+    if (selectedNodes.length < 2) return;
+    const gap = parseInt(document.getElementById('ins-multi-gap')?.value) || 0;
+    const sorted = [...selectedNodes].sort((a, b) => (axis === 'x' ? a.x() - b.x() : a.y() - b.y()));
+    let cursor = axis === 'x' ? sorted[0].x() : sorted[0].y();
+    sorted.forEach(node => {
+        if (axis === 'x') { node.x(cursor); cursor += node.width()  + gap; }
+        else              { node.y(cursor); cursor += node.height() + gap; }
+        const bData = node.getAttr('bladeData');
+        if (bData) node.setAttr('bladeData', bData);
+    });
     tr.forceUpdate();
     layer.batchDraw();
     renderExplorer();
