@@ -50,8 +50,7 @@ export function updateInspectorFromNode() {
     const node  = selectedNodes[0];
     const bData = node.getAttr('bladeData');
     const type  = node.getAttr('uiType');
-    
-    document.getElementById('ins-opacity').value = bData.opacity ?? 1;
+
     document.getElementById('ins-name').value     = bData.name;
     document.getElementById('ins-x').value        = Math.round(node.x());
     document.getElementById('ins-y').value        = Math.round(node.y());
@@ -62,6 +61,10 @@ export function updateInspectorFromNode() {
     // エラーになるので、妥当な16進カラーのみ反映し、それ以外は無難な既定値にする。
     setColorInput('ins-bgcolor', bData.bgcolor, '#ffffff');
     setColorInput('ins-color',   bData.color,   '#000000');
+    // 不透明度（0=透明〜1=不透明）。未設定なら1。
+    // ※ この行は必ず const bData の宣言より後に置くこと（TDZエラー防止）
+    const opacityInput = document.getElementById('ins-opacity');
+    if (opacityInput) opacityInput.value = bData.opacity ?? 1;
     document.getElementById('ins-align').value      = bData.align || 'left';
     document.getElementById('ins-fontfamily').value = bData.fontfamily || 'sans-serif';
     
@@ -193,8 +196,13 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
     bData.text     = document.getElementById('ins-text').value;
     bData.bgcolor  = document.getElementById('ins-bgcolor').value;
     bData.color    = document.getElementById('ins-color').value;
-    bData.opacity = parseFloat(document.getElementById('ins-opacity').value) ?? 1;
+
+    // 不透明度: parseFloat が NaN を返しても ?? は NaN を素通りさせてしまうため、
+    // Number.isFinite で判定し、0〜1にクランプする（不正値で要素が消えるのを防ぐ）。
+    const opacityRaw = parseFloat(document.getElementById('ins-opacity')?.value);
+    bData.opacity = Number.isFinite(opacityRaw) ? Math.min(1, Math.max(0, opacityRaw)) : 1;
     node.opacity(bData.opacity); // Konvaノードに透明度を適用
+
     const newFontsize = parseInt(document.getElementById('ins-fontsize').value) || 16;
     // フォントサイズはデバイスごとに分離: PCはbData.fontsize、スマホは layouts.mobile.fontsize
     if (currentDevice === 'mobile') {

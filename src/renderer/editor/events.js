@@ -19,8 +19,8 @@ import { exitWarpMode, isWarpMode, getWarpTarget } from './warp.js';
 // ============================================================
 
 // Label / Button のリサイズを「scale」から「width/height + fontSize」へ正規化する。
-// リサイズ完了時(transformend)に最終スケールで一度だけ呼ぶ（ドラッグ中の毎フレーム
-// 処理は累積で巨大化するため行わない）。フォント倍率は縦横の大きい方に追従。
+// ドラッグ中(transform)に毎フレーム呼ぶことで、スケール操作中もリアルタイムに
+// 文字サイズが変わる。フォント倍率は縦横の大きい方に追従（どの方向でも変化）。
 function normalizeResize(node) {
     const type = node.getAttr('uiType');
     const sx = node.scaleX(), sy = node.scaleY();
@@ -189,8 +189,8 @@ tr.boundBoxFunc((oldBox, newBox) => {
     if (active.includes('bottom')) { const s = nearest(bottom, ys); if (s !== null) { bottom = s; snapY = s; } }
 
     // ガイド線の表示
-    if (snapX !== null) { vGuide.style.display = 'block'; vGuide.style.left = (snapX * zoom) + 'px'; } else vGuide.style.display = 'none';
-    if (snapY !== null) { hGuide.style.display = 'block'; hGuide.style.top  = (snapY * zoom) + 'px'; } else hGuide.style.display = 'none';
+    if (snapX !== null) { vGuide.style.display = 'block'; vGuide.style.left = Math.min(snapX * zoom, currentCanvasWidth * zoom - 1) + 'px'; } else vGuide.style.display = 'none';
+    if (snapY !== null) { hGuide.style.display = 'block'; hGuide.style.top  = Math.min(snapY * zoom, currentCanvasHeight * zoom - 1) + 'px'; } else hGuide.style.display = 'none';
 
     const nb = { ...newBox, x: left * zoom, y: top * zoom, width: (right - left) * zoom, height: (bottom - top) * zoom };
     if (nb.width < 12 || nb.height < 12) return oldBox;
@@ -240,6 +240,30 @@ stage.on('dragmove', (e) => {
         else if (Math.abs(absMidY - t.midY) < SNAP_THRESHOLD) { snapY = t.midY - draggingNode.height() / 2; guideY = t.midY; showHLine = true; }
     });
 
+    // --- キャンバスの端・中央へスナップ ---
+    const cw = currentCanvasWidth, ch = currentCanvasHeight;
+    const dw = draggingNode.width(), dh = draggingNode.height();
+    [[absMinX, 0, 0], [absMaxX, cw, -dw], [absMidX, cw / 2, -dw / 2]].forEach(([val, edge, off]) => {
+        if (Math.abs(val - edge) < SNAP_THRESHOLD) { snapX = edge + off; guideX = edge; showVLine = true; }
+    });
+    [[absMinY, 0, 0], [absMaxY, ch, -dh], [absMidY, ch / 2, -dh / 2]].forEach(([val, edge, off]) => {
+        if (Math.abs(val - edge) < SNAP_THRESHOLD) { snapY = edge + off; guideY = edge; showHLine = true; }
+    });
+
+    // --- ユーザーが定規から引いたガイドへスナップ ---
+    const gxs = (typeof window.__getGuideXs === 'function') ? window.__getGuideXs() : [];
+    const gys = (typeof window.__getGuideYs === 'function') ? window.__getGuideYs() : [];
+    gxs.forEach(gx => {
+        if      (Math.abs(absMinX - gx) < SNAP_THRESHOLD) { snapX = gx;          guideX = gx; showVLine = true; }
+        else if (Math.abs(absMaxX - gx) < SNAP_THRESHOLD) { snapX = gx - dw;     guideX = gx; showVLine = true; }
+        else if (Math.abs(absMidX - gx) < SNAP_THRESHOLD) { snapX = gx - dw / 2; guideX = gx; showVLine = true; }
+    });
+    gys.forEach(gy => {
+        if      (Math.abs(absMinY - gy) < SNAP_THRESHOLD) { snapY = gy;          guideY = gy; showHLine = true; }
+        else if (Math.abs(absMaxY - gy) < SNAP_THRESHOLD) { snapY = gy - dh;     guideY = gy; showHLine = true; }
+        else if (Math.abs(absMidY - gy) < SNAP_THRESHOLD) { snapY = gy - dh / 2; guideY = gy; showHLine = true; }
+    });
+
     for (let i = 0; i < targets.length; i++) {
         for (let j = 0; j < targets.length; j++) {
             if (i === j) continue;
@@ -275,14 +299,15 @@ stage.on('dragmove', (e) => {
 
     if (showVLine) {
         vGuide.style.display = 'block';
-        vGuide.style.left = (guideX * zoom) + 'px';
+        // 右端(x=幅)はキャンバス枠の外に出てクリップされるので1px内側に寄せて見せる
+        vGuide.style.left = Math.min(guideX * zoom, currentCanvasWidth * zoom - 1) + 'px';
     } else {
         vGuide.style.display = 'none';
     }
 
     if (showHLine) {
         hGuide.style.display = 'block';
-        hGuide.style.top = (guideY * zoom) + 'px';
+        hGuide.style.top = Math.min(guideY * zoom, currentCanvasHeight * zoom - 1) + 'px';
     } else {
         hGuide.style.display = 'none';
     }
@@ -574,19 +599,11 @@ window.addEventListener('keydown', e => {
 // ============================================================
 // 画像のドラッグ＆ドロップ追加
 // ============================================================
-// dragenter/dragover で preventDefault + dropEffect='copy' を設定しないと、
-// ブラウザがドロップを拒否して「🚫 ストップマーク」が出てしまう。
-['dragenter', 'dragover'].forEach(type => {
-    document.getElementById('workspace').addEventListener(type, e => {
-        e.preventDefault();
-        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-    });
-});
+document.getElementById('workspace').addEventListener('dragover', e => e.preventDefault());
 document.getElementById('workspace').addEventListener('drop', async e => {
     e.preventDefault();
-    e.stopPropagation();
     const file = e.dataTransfer.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file?.type.startsWith('image/')) return;
 
     const imageUrl = await uploadImage(file);
     if (!imageUrl) return;

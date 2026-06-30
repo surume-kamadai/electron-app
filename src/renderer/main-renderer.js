@@ -18,6 +18,7 @@ import { newProject, initProject, getPages, getFolders } from './editor/project.
 import { initDockLayout, showPanel, hidePanel } from './editor/dock-layout.js';
 import { initCanvasPreview } from './editor/canvas-preview.js';
 import { initOffscreenIndicators } from './editor/offscreen.js';
+import { initRulers, toggleRulers } from './editor/rulers.js';
 import {
     onProjectNameChange, onOutputTypeChange,
     onCanvasSizeChange, initSettingsUI,
@@ -41,6 +42,7 @@ window.spawnComponent     = spawnComponent;
 window.switchDevice = switchDevice;
 window.playPreview  = playPreview;
 window.stopPreview  = stopPreview;
+window.toggleRulers = toggleRulers;
 window.updateCanvasSize   = onCanvasSizeChange;
 window.alignNodes         = alignNodes;
 
@@ -162,6 +164,7 @@ setTimeout(() => {
     wireEditorButtons();
     initCanvasPreview();        // Slider/Grid/Accordion の実物プレビュー層を起動
     initOffscreenIndicators();  // 画面外要素の位置マーカー層を起動
+    initRulers();               // 定規＆ガイド層を起動
     // モーダルを確実に body 直下へ移動（隠しコンテナ等に巻き込まれない保険）
     ['slider-editor-overlay', 'accordion-editor-overlay', 'preview-overlay'].forEach(id => {
         const el = document.getElementById(id);

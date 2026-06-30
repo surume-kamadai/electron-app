@@ -19,6 +19,8 @@
             <button id="btn-device-pc" onclick="switchDevice('pc')" style="background: none; border: none; font-size: 14px; padding: 4px 8px; opacity: 1; margin: 0; width: auto; font-weight:bold;" title="PC表示">💻 PC</button>
             <button id="btn-device-mobile" onclick="switchDevice('mobile')" style="background: none; border: none; font-size: 14px; padding: 4px 8px; opacity: 0.4; margin: 0; width: auto; font-weight:bold;" title="スマホ表示">📱 Mobile</button>
             <div style="width: 1px; height: 20px; background: #666; margin: 0 5px;"></div>
+            <button onclick="toggleRulers()" style="background: none; border: none; font-size: 14px; padding: 4px 8px; margin: 0; width: auto; font-weight:bold; color:#fff;" title="定規・ガイドの表示/非表示（定規からドラッグでガイド作成）">📏 定規</button>
+            <div style="width: 1px; height: 20px; background: #666; margin: 0 5px;"></div>
             <button onclick="playPreview()" style="background: #27ae60; border: none; font-size: 14px; padding: 4px 12px; margin: 0; width: auto; font-weight:bold; border-radius: 12px; color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);" title="プレビュー再生">▶️ Play</button>
         </div>
         
@@ -269,12 +271,12 @@
                             <label>文字色</label>
                             <input type="color" id="ins-color" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
                         </div>
-                        <div class="form-group">
-                            <label>透明度 (Opacity)</label>
-                            <input type="range" id="ins-opacity" min="0" max="1" step="0.05" value="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
-                        </div>
                     </div>
                     <div class="form-group">
+                        <label>不透明度（透明度）</label>
+                        <input type="range" id="ins-opacity" min="0" max="1" step="0.05" value="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                    </div>
+<div class="form-group">
                         <label>フォントサイズ</label>
                         <input type="number" id="ins-fontsize" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
                     </div>
