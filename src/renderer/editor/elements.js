@@ -67,6 +67,8 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         shadow:   'none',
         animation:'none',
         opacity:  1,
+        // 角の丸み(px)。ボタンは既定で少し丸く、それ以外は角ばった状態から。
+        cornerRadius: type === 'Button' ? 8 : 0,
         // グラデーション（off時は単色 bgcolor）。type: linear|radial, dir: v|h|d1|d2
         gradient: { on: false, type: 'linear', c1: '#4facfe', c2: '#00f2fe', dir: 'v' },
         bgimage:  '',
@@ -110,7 +112,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
                 x: 0, y: 0,
                 width: base.width, height: base.height,
                 fill: bData.bgimage ? null : bData.bgcolor, // 画像があれば色は透明に
-                cornerRadius: 5,
+                cornerRadius: bData.cornerRadius ?? 8,
                 name: 'btn-bg'
             });
 
@@ -118,6 +120,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             const bgImgNode = new Konva.Image({
                 x: 0, y: 0,
                 width: base.width, height: base.height,
+                cornerRadius: bData.cornerRadius ?? 8,
                 name: 'btn-bgimage',
                 visible: !!bData.bgimage
             });
@@ -148,7 +151,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         }
         case 'TextInput': newNode = new Konva.Rect({ ...base, fill: '#fff', stroke: '#ccc', strokeWidth: 1 }); break;
         case 'Label':     newNode = new Konva.Text({ ...base, text: bData.text, fill: bData.color, fontSize: bData.fontsize, align: bData.align || 'left', fontFamily: bData.fontfamily || 'sans-serif' }); break;
-        case 'Rect':      newNode = new Konva.Rect({ ...base, fill: bData.bgcolor }); break;
+        case 'Rect':      newNode = new Konva.Rect({ ...base, fill: bData.bgcolor, cornerRadius: bData.cornerRadius || 0 }); break;
         case 'Warp': {
             const pts = bData.warpPoints || [
                 { x: base.x, y: base.y },
@@ -169,7 +172,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         case 'Image': {
             const img = new Image();
             img.crossOrigin = 'Anonymous';
-            newNode = new Konva.Image({ ...base, image: img });
+            newNode = new Konva.Image({ ...base, image: img, cornerRadius: bData.cornerRadius || 0 });
             // 画像読込後にアスペクト調整。万一失敗しても描画は止めない（画像が出なくならないように）
             img.onload = () => {
                 try { applyImageCover(newNode); } catch (err) { console.error('[applyImageCover]', err); }
@@ -476,6 +479,22 @@ export function applyGradient(node, bData) {
         target.fillLinearGradientEndPoint({ x: x0 + e[0] * w, y: y0 + e[1] * h });
         target.fillLinearGradientColorStops([0, c1, 1, c2]);
         target.fillPriority('linear-gradient');
+    }
+    node.getLayer()?.batchDraw();
+}
+
+// 角の丸みをノードへ適用（Rect / Image / Button内部bg・bg画像）
+export function applyCornerRadius(node, bData) {
+    if (!node) return;
+    const type = node.getAttr('uiType');
+    const r = Math.max(0, parseInt(bData.cornerRadius) || 0);
+    if (type === 'Rect' || type === 'Image') {
+        if (typeof node.cornerRadius === 'function') node.cornerRadius(r);
+    } else if (type === 'Button') {
+        const bg = node.findOne('.btn-bg');
+        const im = node.findOne('.btn-bgimage');
+        if (bg) bg.cornerRadius(r);
+        if (im) im.cornerRadius(r);
     }
     node.getLayer()?.batchDraw();
 }

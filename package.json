@@ -1,6 +1,6 @@
 {
   "name": "site-builder",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "GUIでデザインしてHTML/Laravel Bladeを生成するサイトビルダー",
   "main": "src/main/main.js",
   "scripts": {

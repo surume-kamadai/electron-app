@@ -303,6 +303,8 @@ render() {
             const name     = escapeHtml(props.name ?? 'Unnamed');
             const bgcolor  = escapeHtml(props.bgcolor ?? 'transparent');
             const bgFill   = gradientBgDecl(props, bgcolor);
+            const cornerR  = Math.max(0, parseInt(props.cornerRadius) || 0);
+            const radiusCss = cornerR ? ` border-radius: ${cornerR}px;` : '';
             const color    = escapeHtml(props.color ?? 'inherit');
             const align    = escapeHtml(props.align || (type === 'Button' ? 'center' : 'left'));
             const fontfam  = escapeHtml(props.fontfamily || 'sans-serif');
@@ -350,7 +352,7 @@ render() {
                     out += this.renderLabel(id, animClass, baseStyle, color, text, props, shadowStyle, indent);
                     break;
                 case 'Rect':
-                    out += `${indent}<div id="${id}" class="${animClass}" style="${baseStyle}"></div>\n`;
+                    out += `${indent}<div id="${id}" class="${animClass}" style="${baseStyle}${radiusCss}"></div>\n`;
                     break;
                 case 'Circle':
                     out += `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} border-radius: 50%;"></div>\n`;
@@ -414,7 +416,8 @@ render() {
 
         // <button> はブラウザ既定で text-align:center になるため、揃え設定を明示する
         const align = escapeHtml(props.align || 'center');
-        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; text-align: ${align}; ${shadowStyle}`;
+        const btnR = Math.max(0, parseInt(props.cornerRadius ?? 8) || 0);
+        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: ${btnR}px; cursor: pointer; font-weight: bold; text-align: ${align}; ${shadowStyle}`;
         const formStyle = `margin: 0; position: absolute; width: 100%; height: 100%;`;
 
         // 送信ボタン: ページ全体を包む <form>（render側で出力）が送信を担うので
@@ -470,7 +473,9 @@ render() {
         const src = escapeHtml(resolveImageSrc(props.text, this.imageMap));
         const route = props.route ?? '#';
         const hasLink = route !== '#' && route !== '' && route !== 'none';
-        const imgStyle = `width: 100%; height: 100%; object-fit: contain; display: block; ${shadowStyle}`;
+        const r = Math.max(0, parseInt(props.cornerRadius) || 0);
+        const rc = r ? ` border-radius: ${r}px;` : '';
+        const imgStyle = `width: 100%; height: 100%; object-fit: contain; display: block; ${shadowStyle}${rc}`;
         const g = props.gradient;
         // グラデーション on の画像は、画像の上に gradient を乗算で重ねるオーバーレイを置く
         const overlay = (g && g.on)

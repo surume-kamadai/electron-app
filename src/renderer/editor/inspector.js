@@ -5,7 +5,7 @@ import { layer, tr } from './canvas.js';
 import { selectedNodes, setSelectedNodes, currentDevice, setElementCount } from './state.js';
 import { saveHistory } from './history.js';
 import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient } from './elements.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius } from './elements.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { showToast } from './toast.js';
 
@@ -184,6 +184,17 @@ export function updateInspectorFromNode() {
     document.getElementById('ins-shadow').value    = bData.shadow || 'none';
     document.getElementById('ins-animation').value = bData.animation || 'none';
 
+    // ▼ 角の丸み（四角・ボタン・画像で表示）
+    const cornerGroup = document.getElementById('group-corner');
+    if (cornerGroup) {
+        const supportsCorner = ['Rect', 'Button', 'Image'].includes(type);
+        cornerGroup.style.display = supportsCorner ? 'block' : 'none';
+        if (supportsCorner) {
+            const cr = document.getElementById('ins-corner');
+            if (cr) cr.value = Math.max(0, parseInt(bData.cornerRadius) || 0);
+        }
+    }
+
     // ▼ グラデーション設定（図形・ボタン・画像で表示）
     const gradGroup = document.getElementById('group-gradient');
     if (gradGroup) {
@@ -356,6 +367,12 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
         // 幅・高さは上の node.width()/height() で設定済み（sceneFunc が箱に合わせて再描画）
     } else if (type === 'Image') {
         applyImageCover(node);
+    }
+
+    // 角の丸みの保存と適用
+    if (['Rect', 'Button', 'Image'].includes(type)) {
+        bData.cornerRadius = Math.max(0, parseInt(document.getElementById('ins-corner').value) || 0);
+        applyCornerRadius(node, bData);
     }
 
     // グラデーション設定の保存と適用（単色塗りの後に上書き）

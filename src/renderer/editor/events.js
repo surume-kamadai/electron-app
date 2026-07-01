@@ -3,8 +3,8 @@
 // ステージ操作 / キーボード / パネルドラッグ / 画像D&D / 右クリック
 // ============================================================
 import { stage, layer, tr, selectionRect } from './canvas.js';
-import { selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
-import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient } from './elements.js';
+import {selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
+import { getNextElementCount,  applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient } from './elements.js';
 import { saveHistory, undo, redo } from './history.js';
 import { updateInspectorFromNode, deleteSelectedNode } from './inspector.js';
 import { renderExplorer } from './explorer.js';
@@ -13,7 +13,6 @@ import { showToast } from './toast.js';
 import { processNode } from './converter.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { exitWarpMode, isWarpMode, getWarpTarget } from './warp.js';
-
 // ============================================================
 // ステージ: トランスフォーム完了時のグループスケール正規化
 // ============================================================
@@ -569,11 +568,11 @@ function pasteClipboard() {
     if (clipboardData.length === 0) return;
     applySelectedNodes([]);
 
-    // 旧ID → 新ID のマップ（イベントターゲット再マッピング用）
-    const idMap = new Map();
+    const idMap = {}; 
+    const tempMap = {}; // ★ 追加
 
     function regenerateIds(data, isRoot) {
-        const count = incrementElementCount();
+        const count = getNextElementCount(data.type, tempMap);
         const newId = data.type.toLowerCase() + '_' + count;
         idMap.set(data.id, newId);
         data.id = newId;
