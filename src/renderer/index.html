@@ -15,6 +15,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Serif+JP:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;700&family=Kosugi+Maru&family=Sawarabi+Mincho&family=Zen+Maru+Gothic:wght@400;700&family=Yusei+Magic&family=Dela+Gothic+One&display=swap" rel="stylesheet">
+    <!-- カラーピッカー(Pickr): 色相＋SV＋透明度(A)が一体のポップアップ -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/nano.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
 </head>
 <body>
     <div class="workspace" id="workspace">
@@ -120,12 +123,12 @@
                 <div class="row">
                     <div class="form-group">
                         <label>サイト全体</label>
-                        <input type="color" id="site-bg-color" value="#f1f2f6" onchange="updateSiteBgColor()">
+                        <input type="hidden" id="site-bg-color" value="#f1f2f6" onchange="updateSiteBgColor()"><button type="button" class="color-field" data-noalpha data-for="site-bg-color"></button>
                     </div>
                     <div class="form-group">
                         <label>このページ</label>
                         <div style="display:flex; gap:4px; align-items:center;">
-                            <input type="color" id="page-bg-color" value="#f1f2f6" onchange="updatePageBgColor()" style="flex:1;">
+                            <input type="hidden" id="page-bg-color" value="#f1f2f6" onchange="updatePageBgColor()"><button type="button" class="color-field" data-noalpha data-for="page-bg-color"></button>
                             <button type="button" onclick="clearPageBgColor()" title="ページ個別指定を解除（サイト全体に従う）" style="width:auto; margin:0; padding:4px 8px; font-size:11px; background:#555;">解除</button>
                         </div>
                     </div>
@@ -288,7 +291,7 @@
                             <div class="row">
                                 <div class="form-group">
                                     <label>影の色</label>
-                                    <input type="color" id="ins-ds-color" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                    <input type="hidden" id="ins-ds-color" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-ds-color"></button>
                                 </div>
                                 <div class="form-group">
                                     <label>不透明度</label>
@@ -306,16 +309,12 @@
                     </div>
                     <div class="row">
                         <div class="form-group">
-                            <label>背景色</label>
-                            <input type="color" id="ins-bgcolor" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
-                            <label style="font-size:10px; color:#aaa; margin-top:2px;">背景の透明度</label>
-                            <input type="range" id="ins-bg-alpha" min="0" max="1" step="0.05" value="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            <label>背景色（透明度対応）</label>
+                            <input type="hidden" id="ins-bgcolor" value="#ffffff" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-for="ins-bgcolor"></button>
                         </div>
                         <div class="form-group">
-                            <label>文字色</label>
-                            <input type="color" id="ins-color" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
-                            <label style="font-size:10px; color:#aaa; margin-top:2px;">文字の透明度</label>
-                            <input type="range" id="ins-text-alpha" min="0" max="1" step="0.05" value="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            <label>文字色（透明度対応）</label>
+                            <input type="hidden" id="ins-color" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-for="ins-color"></button>
                         </div>
                     </div>
                     <div class="form-group">
@@ -338,7 +337,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label>線の色</label>
-                                    <input type="color" id="ins-stroke-color" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                    <input type="hidden" id="ins-stroke-color" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-for="ins-stroke-color"></button>
                                 </div>
                             </div>
                             <div style="font-size:10px; color:#888;">テキストは文字の縁取り（-webkit-text-stroke）になります</div>
@@ -369,11 +368,11 @@
                             <div class="row">
                                 <div class="form-group">
                                     <label>色1（開始 / 中央）</label>
-                                    <input type="color" id="ins-grad-c1" value="#4facfe" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                    <input type="hidden" id="ins-grad-c1" value="#4facfe" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-for="ins-grad-c1"></button>
                                 </div>
                                 <div class="form-group">
                                     <label>色2（終了 / 端）</label>
-                                    <input type="color" id="ins-grad-c2" value="#00f2fe" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                    <input type="hidden" id="ins-grad-c2" value="#00f2fe" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-for="ins-grad-c2"></button>
                                 </div>
                             </div>
                             <div style="font-size:10px; color:#888;">画像はグラデーションを上から重ねます（乗算）</div>
@@ -510,7 +509,7 @@
                             </div>
                             <div class="form-group">
                                 <label>矢印ボタン色</label>
-                                <input type="color" id="ins-grid-arrow" value="#27ae60" onchange="onInspectorUpdate(true)">
+                                <input type="hidden" id="ins-grid-arrow" value="#27ae60" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-grid-arrow"></button>
                             </div>
                         </div>
 
@@ -568,17 +567,17 @@
                         <div class="row">
                             <div class="form-group">
                                 <label>見出し文字色</label>
-                                <input type="color" id="ins-acc-headercolor" value="#2c3e50" onchange="onInspectorUpdate(true)">
+                                <input type="hidden" id="ins-acc-headercolor" value="#2c3e50" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-acc-headercolor"></button>
                             </div>
                             <div class="form-group">
                                 <label>見出し背景色</label>
-                                <input type="color" id="ins-acc-headerbg" value="#f7f9fa" onchange="onInspectorUpdate(true)">
+                                <input type="hidden" id="ins-acc-headerbg" value="#f7f9fa" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-acc-headerbg"></button>
                             </div>
                         </div>
                         <div class="row">
                             <div class="form-group">
                                 <label>本文文字色</label>
-                                <input type="color" id="ins-acc-bodycolor" value="#555555" onchange="onInspectorUpdate(true)">
+                                <input type="hidden" id="ins-acc-bodycolor" value="#555555" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-acc-bodycolor"></button>
                             </div>
                             <div class="form-group">
                                 <label><input type="checkbox" id="ins-acc-openfirst" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 最初を開いた状態に</label>

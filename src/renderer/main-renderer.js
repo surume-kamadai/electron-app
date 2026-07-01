@@ -20,6 +20,7 @@ import { initCanvasPreview } from './editor/canvas-preview.js';
 import { initOffscreenIndicators } from './editor/offscreen.js';
 import { initRulers, toggleRulers } from './editor/rulers.js';
 import { initGradientOverlay } from './editor/gradient-overlay.js';
+import { initColorPickers } from './editor/color-picker.js';
 import {
     onProjectNameChange, onOutputTypeChange,
     onCanvasSizeChange, initSettingsUI,
@@ -168,6 +169,7 @@ setTimeout(() => {
     initOffscreenIndicators();  // 画面外要素の位置マーカー層を起動
     initRulers();               // 定規＆ガイド層を起動
     initGradientOverlay();      // 画像グラデーションのオーバーレイ層を起動
+    initColorPickers();         // アルファ対応(RGBA)カラーピッカーを配線
     // モーダルを確実に body 直下へ移動（隠しコンテナ等に巻き込まれない保険）
     ['slider-editor-overlay', 'accordion-editor-overlay', 'preview-overlay'].forEach(id => {
         const el = document.getElementById(id);

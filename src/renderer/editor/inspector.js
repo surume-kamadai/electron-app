@@ -24,7 +24,41 @@ async function pickImageDialog() {
 function setColorInput(id, val, def) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.value = (typeof val === 'string' && /^#[0-9a-fA-F]{6}$/.test(val)) ? val : def;
+    const v = (typeof val === 'string' && val) ? val : def;
+    // Pickr のスウォッチ(.color-field＋隠しinput)があればそちらへ、無ければ従来 type=color(hex)
+    if (window.__setColorField && document.querySelector(`.color-field[data-for="${id}"]`)) {
+        window.__setColorField(id, v);
+    } else {
+        el.value = /^#[0-9a-fA-F]{6}$/.test(v) ? v : def;
+    }
+}
+
+// 色文字列(#rrggbb または rgba(...)) を { hex, a } に分解
+function parseHexA(str, def) {
+    str = String(str ?? '').trim();
+    let m = str.match(/^#([0-9a-fA-F]{6})$/);
+    if (m) return { hex: '#' + m[1], a: 1 };
+    m = str.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?/i);
+    if (m) {
+        const h = v => Math.max(0, Math.min(255, +v)).toString(16).padStart(2, '0');
+        return { hex: '#' + h(m[1]) + h(m[2]) + h(m[3]), a: m[4] != null ? parseFloat(m[4]) : 1 };
+    }
+    return { hex: def || '#000000', a: 1 };
+}
+
+// 色(rgba/hex) → ネイティブ色ピッカー(hex) ＋ A欄(0〜1) へ反映
+function setColorA(colorId, alphaId, value, def) {
+    const { hex, a } = parseHexA(value || def, def);
+    setColorInput(colorId, hex, def);
+    const ael = document.getElementById(alphaId);
+    if (ael) ael.value = a;
+}
+
+// ネイティブ色ピッカー(hex) ＋ A欄 → rgba(...)（Aが1なら hex のまま）
+function getColorA(colorId, alphaId) {
+    const hex = document.getElementById(colorId)?.value || '#000000';
+    const a = Math.min(1, Math.max(0, parseFloat(document.getElementById(alphaId)?.value ?? 1)));
+    return toRgba(hex, a);
 }
 
 export function hideInspector() {
@@ -65,10 +99,6 @@ export function updateInspectorFromNode() {
     // ※ この行は必ず const bData の宣言より後に置くこと（TDZエラー防止）
     const opacityInput = document.getElementById('ins-opacity');
     if (opacityInput) opacityInput.value = bData.opacity ?? 1;
-    const bgAlphaEl = document.getElementById('ins-bg-alpha');
-    if (bgAlphaEl) bgAlphaEl.value = (bData.bgAlpha == null ? 1 : bData.bgAlpha);
-    const textAlphaEl = document.getElementById('ins-text-alpha');
-    if (textAlphaEl) textAlphaEl.value = (bData.textAlpha == null ? 1 : bData.textAlpha);
     document.getElementById('ins-align').value      = bData.align || 'left';
     document.getElementById('ins-fontfamily').value = bData.fontfamily || 'sans-serif';
     
@@ -110,7 +140,7 @@ export function updateInspectorFromNode() {
             document.getElementById('ins-grid-columns').value = g.columns ?? 3;
             document.getElementById('ins-grid-gap').value     = g.gap ?? 20;
             document.getElementById('ins-grid-radius').value  = g.cardRadius ?? 8;
-            document.getElementById('ins-grid-arrow').value   = g.arrowColor ?? '#27ae60';
+            setColorInput('ins-grid-arrow', g.arrowColor, '#27ae60');
             document.getElementById('ins-grid-imgratio').value = g.imgRatio ?? '16/10';
             document.getElementById('ins-grid-padding').value  = g.cardPadding ?? 18;
             document.getElementById('ins-grid-slidermode').checked = g.sliderMode ?? false;
@@ -129,9 +159,9 @@ export function updateInspectorFromNode() {
         groupAcc.style.display = (type === 'Accordion') ? 'block' : 'none';
         if (type === 'Accordion') {
             const a = bData.accordion || {};
-            document.getElementById('ins-acc-headercolor').value = a.headerColor ?? '#2c3e50';
-            document.getElementById('ins-acc-headerbg').value    = a.headerBg ?? '#f7f9fa';
-            document.getElementById('ins-acc-bodycolor').value   = a.bodyColor ?? '#555555';
+            setColorInput('ins-acc-headercolor', a.headerColor, '#2c3e50');
+            setColorInput('ins-acc-headerbg',    a.headerBg,    '#f7f9fa');
+            setColorInput('ins-acc-bodycolor',   a.bodyColor,   '#555555');
             document.getElementById('ins-acc-openfirst').checked = a.openFirst ?? true;
         }
     }
@@ -254,10 +284,8 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
 
     bData.name     = document.getElementById('ins-name').value;
     bData.text     = document.getElementById('ins-text').value;
-    bData.bgcolor  = document.getElementById('ins-bgcolor').value;
+    bData.bgcolor  = document.getElementById('ins-bgcolor').value;   // #rrggbb または rgba(...)
     bData.color    = document.getElementById('ins-color').value;
-    bData.bgAlpha  = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-bg-alpha')?.value ?? 1)));
-    bData.textAlpha = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-text-alpha')?.value ?? 1)));
 
     // 不透明度: parseFloat が NaN を返しても ?? は NaN を素通りさせてしまうため、
     // Number.isFinite で判定し、0〜1にクランプする（不正値で要素が消えるのを防ぐ）。
