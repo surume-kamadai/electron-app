@@ -47,9 +47,41 @@ export function applySelectedNodes(nodes) {
     layer.batchDraw();
 }
 
+// 指定タイプの既存要素(グループ内も含む)を走査し、次に使う番号(=最大+1)を返す。
+// これにより「タイプごとに採番」「削除後は残っている同タイプの最大番号の次から」が成立する。
+export function nextNumberForType(type) {
+    let max = 0;
+    const prefix = String(type).toLowerCase() + '_';
+    const scan = (container) => {
+        container.getChildren().forEach(n => {
+            if (!n.hasName || !n.hasName('ui-element')) return;
+            if (n.getAttr('uiType') === type) {
+                const s = String(n.id() || '');
+                if (s.startsWith(prefix)) {
+                    const num = parseInt(s.slice(prefix.length), 10);
+                    if (Number.isFinite(num)) max = Math.max(max, num);
+                }
+            }
+            if (n.getAttr('uiType') === 'Group') scan(n);
+        });
+    };
+    scan(layer);
+    return max + 1;
+}
+
+// バッチ生成(コンポーネント/貼り付け)用: 同一タイプを衝突なく連番で払い出す。
+// レイヤーにまだ無いノードを一括生成するため、ローカルに加算していく。
+export function makeTypeCounter() {
+    const local = {};
+    return (type) => {
+        if (local[type] === undefined) local[type] = nextNumberForType(type) - 1;
+        return ++local[type];
+    };
+}
+
 // --- 要素の生成 ---
 export function spawnElement(type, loadData = null, parentGroup = layer, isHistoryLoad = false, noHistorySave = false) {
-    const count = loadData ? null : incrementElementCount();
+    const count = loadData ? null : nextNumberForType(type);
     const id    = loadData ? loadData.id : type.toLowerCase() + '_' + count;
 
     const bData = loadData ? loadData.properties : {
@@ -57,6 +89,8 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         text:     type === 'Image' ? 'https://placehold.co/150x150/png' : 'テキスト',
         bgcolor:  DEFAULT_PROPS[type]?.bgcolor  ?? '#ffffff',
         color:    '#000000',
+        bgAlpha:  1,   // 背景色の不透明度
+        textAlpha:1,   // 文字色の不透明度
         fontsize: 16,
         align:    'left',
         fontfamily:'sans-serif',
@@ -71,6 +105,10 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         cornerRadius: type === 'Button' ? 8 : 0,
         // グラデーション（off時は単色 bgcolor）。type: linear|radial, dir: v|h|d1|d2
         gradient: { on: false, type: 'linear', c1: '#4facfe', c2: '#00f2fe', dir: 'v' },
+        // 境界線（レイヤースタイルの Stroke）。図形/ボタン/画像/テキストに適用
+        stroke:   { on: false, width: 2, color: '#000000' },
+        // ドロップシャドウ(自由値)。on時はプリセット shadow より優先。
+        dropShadow: { on: false, x: 4, y: 4, blur: 10, spread: 0, color: '#000000', opacity: 0.35 },
         bgimage:  '',
         // フォーム用: Button の役割（'link' | 'submit'）
         role:     type === 'Button' ? 'link' : 'none',
@@ -139,7 +177,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             const txt = new Konva.Text({
                 x: 0, y: 0,
                 width: base.width, height: base.height,
-                text: bData.text, fill: bData.color, fontSize: bData.fontsize,
+                text: bData.text, fill: toRgba(bData.color, bData.textAlpha), fontSize: bData.fontsize,
                 align: bData.align || 'center',
                 fontFamily: bData.fontfamily || 'sans-serif',
                 verticalAlign: 'middle',
@@ -150,7 +188,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             break;
         }
         case 'TextInput': newNode = new Konva.Rect({ ...base, fill: '#fff', stroke: '#ccc', strokeWidth: 1 }); break;
-        case 'Label':     newNode = new Konva.Text({ ...base, text: bData.text, fill: bData.color, fontSize: bData.fontsize, align: bData.align || 'left', fontFamily: bData.fontfamily || 'sans-serif' }); break;
+        case 'Label':     newNode = new Konva.Text({ ...base, text: bData.text, fill: toRgba(bData.color, bData.textAlpha), fontSize: bData.fontsize, align: bData.align || 'left', fontFamily: bData.fontfamily || 'sans-serif' }); break;
         case 'Rect':      newNode = new Konva.Rect({ ...base, fill: bData.bgcolor, cornerRadius: bData.cornerRadius || 0 }); break;
         case 'Warp': {
             const pts = bData.warpPoints || [
@@ -275,6 +313,8 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         newNode.opacity(Math.min(1, Math.max(0, bData.opacity)));
     }
     applyGradient(newNode, bData);
+    applyStroke(newNode, bData);
+    applyDropShadow(newNode, bData);
 
     newNode.on('dragend transformend', () => {
         updateInspectorFromNode();
@@ -297,7 +337,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
 // --- グループ化 / 解除 ---
 export function groupNodes() {
     if (selectedNodes.length < 2) return;
-    const count = incrementElementCount();
+    const count = nextNumberForType('Group');
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     selectedNodes.forEach(node => {
@@ -437,6 +477,17 @@ export function applyNodeShadow(node, shadowType) {
     }
 }
 
+// #rrggbb + アルファ(0〜1) → 不透明なら hex のまま、半透明なら rgba() を返す。
+// 非hex(transparent 等)や未指定は元の値をそのまま返す。
+export function toRgba(hex, alpha) {
+    const a = (alpha == null) ? 1 : Math.min(1, Math.max(0, parseFloat(alpha)));
+    if (!/^#[0-9a-fA-F]{6}$/.test(String(hex))) return hex;
+    if (a >= 1) return hex;
+    const n = hex.slice(1);
+    const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
 // グラデーション（線形/放射状）をノードへ適用。off なら単色塗りに戻す。
 // 対象: Rect / Circle / Triangle / Button(内部bg)。Image はDOMオーバーレイ側で描画する。
 export function applyGradient(node, bData) {
@@ -454,7 +505,8 @@ export function applyGradient(node, bData) {
     const g = bData.gradient;
     if (!g || !g.on) {
         target.fillPriority('color');
-        target.fill(type === 'Button' ? (bData.bgimage ? null : bData.bgcolor) : bData.bgcolor);
+        const bg = toRgba(bData.bgcolor, bData.bgAlpha);
+        target.fill(type === 'Button' ? (bData.bgimage ? null : bg) : bg);
         node.getLayer()?.batchDraw();
         return;
     }
@@ -480,6 +532,43 @@ export function applyGradient(node, bData) {
         target.fillLinearGradientColorStops([0, c1, 1, c2]);
         target.fillPriority('linear-gradient');
     }
+    node.getLayer()?.batchDraw();
+}
+
+// 境界線(Stroke)をノードへ適用。対象: Rect/Circle/Button(内部bg)/Image/Label(文字の縁取り)。
+// TextInput は独自の枠を持つので対象外。
+export function applyStroke(node, bData) {
+    if (!node) return;
+    const type = node.getAttr('uiType');
+    const SUPPORTED = ['Rect', 'Circle', 'Button', 'Image', 'Label'];
+    if (!SUPPORTED.includes(type)) return;
+    const s = bData.stroke || {};
+    const on = !!s.on;
+    const w = on ? Math.max(0, parseFloat(s.width) || 0) : 0;
+    const c = s.color || '#000000';
+    const target = (type === 'Button') ? node.findOne('.btn-bg') : node;
+    if (!target || typeof target.stroke !== 'function') return;
+    target.stroke(c);
+    target.strokeWidth(w);
+    if (typeof target.strokeEnabled === 'function') target.strokeEnabled(w > 0);
+    node.getLayer()?.batchDraw();
+}
+
+// ドロップシャドウ(自由値)を適用。on の時だけプリセットを上書きする（off時は applyNodeShadow に委ねる）。
+// Konva はスプレッド未対応のためエディタ表示は近似（スプレッドは出力CSSにのみ反映）。
+export function applyDropShadow(node, bData) {
+    const d = bData && bData.dropShadow;
+    if (!d || !d.on) return;
+    const uiType = node.getAttr('uiType');
+    let target = node;
+    if (uiType === 'Button') target = node.findOne('.btn-bg');
+    else if (uiType === 'Slider' || uiType === 'Accordion' || uiType === 'ArticleGrid') target = node.findOne('Rect');
+    if (uiType === 'Group' || !target || typeof target.shadowColor !== 'function') return;
+    target.shadowColor(d.color || '#000000');
+    target.shadowOffsetX(parseFloat(d.x) || 0);
+    target.shadowOffsetY(parseFloat(d.y) || 0);
+    target.shadowBlur(Math.max(0, parseFloat(d.blur) || 0));
+    target.shadowOpacity(Math.min(1, Math.max(0, d.opacity ?? 0.35)));
     node.getLayer()?.batchDraw();
 }
 
@@ -599,9 +688,9 @@ export function spawnComponent(componentName) {
 
     if (!data) return;
 
+    const nextNum = makeTypeCounter();
     function assignIds(nodeData) {
-        const count = incrementElementCount();
-        nodeData.id = nodeData.type.toLowerCase() + '_' + count;
+        nodeData.id = nodeData.type.toLowerCase() + '_' + nextNum(nodeData.type);
         if (nodeData.children) {
             nodeData.children.forEach(assignIds);
         }

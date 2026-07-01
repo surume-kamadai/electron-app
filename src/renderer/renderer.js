@@ -24,6 +24,18 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+// エディタの選択肢と対応する Google Fonts。出力HTMLの<head>へ、使用フォントのみ<link>する。
+const GOOGLE_FONTS = [
+    { family: 'Noto Sans JP',      spec: 'Noto+Sans+JP:wght@400;700' },
+    { family: 'Noto Serif JP',     spec: 'Noto+Serif+JP:wght@400;700' },
+    { family: 'M PLUS Rounded 1c', spec: 'M+PLUS+Rounded+1c:wght@400;700' },
+    { family: 'Zen Maru Gothic',   spec: 'Zen+Maru+Gothic:wght@400;700' },
+    { family: 'Kosugi Maru',       spec: 'Kosugi+Maru' },
+    { family: 'Sawarabi Mincho',   spec: 'Sawarabi+Mincho' },
+    { family: 'Yusei Magic',       spec: 'Yusei+Magic' },
+    { family: 'Dela Gothic One',   spec: 'Dela+Gothic+One' },
+];
+
 function resolveImageSrc(src, imageMap) {
     if (typeof src === 'string' && src.startsWith('data:image')) {
         return imageMap.get(src) || src;
@@ -40,7 +52,34 @@ function gradientBgDecl(props, bgcolorEscaped) {
         const DEG = { v: 180, h: 90, d1: 135, d2: 225 };
         return `background: linear-gradient(${DEG[g.dir] ?? 180}deg, ${c1}, ${c2});`;
     }
+    // 背景の透明度（bgAlpha<1）は rgba() で出力
+    const bgA = props.bgAlpha;
+    if (bgA != null && bgA < 1 && /^#[0-9a-fA-F]{6}$/.test(props.bgcolor || '')) {
+        return `background-color: ${hexToRgba(props.bgcolor, bgA)};`;
+    }
     return `background-color: ${bgcolorEscaped};`;
+}
+
+// #rrggbb(または#rgb) と不透明度 → rgba() 文字列
+function hexToRgba(hex, a) {
+    const h = String(hex ?? '#000000').replace('#', '');
+    const n = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+    const r = parseInt(n.slice(0, 2), 16) || 0;
+    const g = parseInt(n.slice(2, 4), 16) || 0;
+    const b = parseInt(n.slice(4, 6), 16) || 0;
+    const al = Math.min(1, Math.max(0, a ?? 1));
+    return `rgba(${r}, ${g}, ${b}, ${al})`;
+}
+
+// 境界線(Stroke)のCSS宣言。図形/ボタン/画像は border、テキストは -webkit-text-stroke。
+function strokeDecl(props, type) {
+    const s = props.stroke;
+    if (!s || !s.on) return '';
+    const w = Math.max(0, parseFloat(s.width) || 0);
+    if (w <= 0) return '';
+    const c = escapeHtml(s.color || '#000000');
+    if (type === 'Label') return ` -webkit-text-stroke: ${w}px ${c};`;
+    return ` border: ${w}px solid ${c};`;
 }
 
 // シーンデータ（1ページ分: canvas/bgColor/seo/elements）を受け取り、
@@ -59,6 +98,7 @@ export class HtmlRenderer {
         // レスポンシブ用CSS と 動的JS を描画中に溜めて、最後に <head>/<script> へ出力する
         this.dynamicCss = [];
         this.dynamicJs  = [];
+        this.usedFonts  = new Set();  // 使用された Google Fonts の spec を溜める
         this._mobileW = 375;          // スマホ表示の基準幅
         this._mobileCanvasH = 800;    // スマホ表示の基準高さ
     }
@@ -110,6 +150,14 @@ render() {
         if (seo.siteName)    html += `    <meta property="og:site_name" content="${escapeHtml(seo.siteName)}">\n`;
         html += `    <meta name="twitter:card" content="${seo.ogImage ? 'summary_large_image' : 'summary'}">\n`;
         // ▲▲ SEO メタタグ構築ここまで ▲▲
+
+        // ▼ 使用された Google Fonts の読み込み（該当フォントを使った時だけ）
+        if (this.usedFonts.size > 0) {
+            html += '    <link rel="preconnect" href="https://fonts.googleapis.com">\n';
+            html += '    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n';
+            const fams = [...this.usedFonts].map(s => 'family=' + s).join('&');
+            html += `    <link href="https://fonts.googleapis.com/css2?${fams}&display=swap" rel="stylesheet">\n`;
+        }
 
         html += '    <style>\n' + ANIM_CSS + '\n    </style>\n';
         html += '    <style id="dynamic-styles">\n    ' + cssString + '\n    </style>\n';
@@ -305,9 +353,16 @@ render() {
             const bgFill   = gradientBgDecl(props, bgcolor);
             const cornerR  = Math.max(0, parseInt(props.cornerRadius) || 0);
             const radiusCss = cornerR ? ` border-radius: ${cornerR}px;` : '';
+            const strokeCss = strokeDecl(props, type);
             const color    = escapeHtml(props.color ?? 'inherit');
+            // 文字色の透明度（textAlpha<1）は rgba()
+            const colorVal = (props.textAlpha != null && props.textAlpha < 1 && /^#[0-9a-fA-F]{6}$/.test(props.color || ''))
+                ? hexToRgba(props.color, props.textAlpha) : color;
             const align    = escapeHtml(props.align || (type === 'Button' ? 'center' : 'left'));
             const fontfam  = escapeHtml(props.fontfamily || 'sans-serif');
+            // 使用中の Google Font を検出（出力headに<link>する）
+            const rawFam = props.fontfamily || '';
+            GOOGLE_FONTS.forEach(f => { if (rawFam.includes(f.family)) this.usedFonts.add(f.spec); });
 
             let animClass = className; // レスポンシブ用クラスを割り当て
             if (props.animation && props.animation !== 'none') {
@@ -324,7 +379,16 @@ render() {
                 float:    '0 20px 30px rgba(0,0,0,0.28)',
             };
             let shadowStyle = '';
-            if (SHADOW_CSS[shadow]) {
+            const ds = props.dropShadow;
+            if (ds && ds.on) {
+                // 自由値ドロップシャドウ（プリセットより優先）
+                const dx = parseFloat(ds.x) || 0, dy = parseFloat(ds.y) || 0;
+                const dblur = Math.max(0, parseFloat(ds.blur) || 0), dspread = parseFloat(ds.spread) || 0;
+                const drgba = hexToRgba(ds.color || '#000000', ds.opacity ?? 0.35);
+                shadowStyle = (type === 'Label')
+                    ? `text-shadow: ${dx}px ${dy}px ${dblur}px ${drgba};`               // text-shadow はスプレッド非対応
+                    : `box-shadow: ${dx}px ${dy}px ${dblur}px ${dspread}px ${drgba};`;
+            } else if (SHADOW_CSS[shadow]) {
                 shadowStyle = (type === 'Label' ? 'text-shadow: ' : 'box-shadow: ') + SHADOW_CSS[shadow] + ';';
             }
 
@@ -332,9 +396,10 @@ render() {
             let baseStyle = `position: absolute; box-sizing: border-box;`;
             // Group / ArticleGrid / Accordion は自前でレイアウトを組むので baseStyle に背景を付けない
             if (type !== 'Group' && type !== 'ArticleGrid' && type !== 'Accordion' && type !== 'Triangle') {
-                baseStyle += ` ${bgFill} color: ${color}; text-align: ${align}; font-family: ${fontfam};`;
-                if (type !== 'Button' && type !== 'Image') baseStyle += ` ${shadowStyle}`; 
+                baseStyle += ` ${bgFill} color: ${colorVal}; text-align: ${align}; font-family: ${fontfam};`;
+                if (type !== 'Button' && type !== 'Image') baseStyle += ` ${shadowStyle}`;
             }
+            baseStyle += strokeCss;  // 境界線（テキストは文字縁取り、他は border）
 
             out += `${indent}\n`;
 
@@ -417,7 +482,9 @@ render() {
         // <button> はブラウザ既定で text-align:center になるため、揃え設定を明示する
         const align = escapeHtml(props.align || 'center');
         const btnR = Math.max(0, parseInt(props.cornerRadius ?? 8) || 0);
-        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: ${btnR}px; cursor: pointer; font-weight: bold; text-align: ${align}; ${shadowStyle}`;
+        const btnColor = (props.textAlpha != null && props.textAlpha < 1 && /^#[0-9a-fA-F]{6}$/.test(props.color || ''))
+            ? hexToRgba(props.color, props.textAlpha) : color;
+        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${btnColor}; font-size: inherit; border: none; border-radius: ${btnR}px; cursor: pointer; font-weight: bold; text-align: ${align}; ${shadowStyle}${strokeDecl(props, 'Button')}`;
         const formStyle = `margin: 0; position: absolute; width: 100%; height: 100%;`;
 
         // 送信ボタン: ページ全体を包む <form>（render側で出力）が送信を担うので
