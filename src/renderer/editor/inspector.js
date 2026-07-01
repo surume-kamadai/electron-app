@@ -2,10 +2,10 @@
 // インスペクター (プロパティパネル)
 // ============================================================
 import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
+import { selectedNodes, setSelectedNodes, currentDevice, setElementCount } from './state.js';
 import { saveHistory } from './history.js';
 import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle, applyImageCover } from './elements.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient } from './elements.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { showToast } from './toast.js';
 
@@ -184,6 +184,23 @@ export function updateInspectorFromNode() {
     document.getElementById('ins-shadow').value    = bData.shadow || 'none';
     document.getElementById('ins-animation').value = bData.animation || 'none';
 
+    // ▼ グラデーション設定（図形・ボタン・画像で表示）
+    const gradGroup = document.getElementById('group-gradient');
+    if (gradGroup) {
+        const supportsGrad = ['Rect', 'Circle', 'Triangle', 'Button', 'Image'].includes(type);
+        gradGroup.style.display = supportsGrad ? 'block' : 'none';
+        if (supportsGrad) {
+            const g = bData.gradient || { on: false, type: 'linear', c1: '#4facfe', c2: '#00f2fe', dir: 'v' };
+            document.getElementById('ins-grad-on').checked   = !!g.on;
+            document.getElementById('ins-grad-type').value   = g.type || 'linear';
+            document.getElementById('ins-grad-dir').value    = g.dir  || 'v';
+            setColorInput('ins-grad-c1', g.c1, '#4facfe');
+            setColorInput('ins-grad-c2', g.c2, '#00f2fe');
+            document.getElementById('grad-fields').style.display   = g.on ? 'block' : 'none';
+            document.getElementById('grad-dir-wrap').style.display = (g.type === 'radial') ? 'none' : 'block';
+        }
+    }
+
     renderEventList(node);
 }
 
@@ -339,6 +356,20 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
         // 幅・高さは上の node.width()/height() で設定済み（sceneFunc が箱に合わせて再描画）
     } else if (type === 'Image') {
         applyImageCover(node);
+    }
+
+    // グラデーション設定の保存と適用（単色塗りの後に上書き）
+    if (['Rect', 'Circle', 'Triangle', 'Button', 'Image'].includes(type)) {
+        if (!bData.gradient) bData.gradient = {};
+        bData.gradient.on   = document.getElementById('ins-grad-on').checked;
+        bData.gradient.type = document.getElementById('ins-grad-type').value;
+        bData.gradient.dir  = document.getElementById('ins-grad-dir').value;
+        bData.gradient.c1   = document.getElementById('ins-grad-c1').value;
+        bData.gradient.c2   = document.getElementById('ins-grad-c2').value;
+        applyGradient(node, bData);  // Image は no-op（DOMオーバーレイ側で描画）
+        // チェックON/種類変更に応じて詳細欄の表示を即時に切り替える（再選択を待たない）
+        document.getElementById('grad-fields').style.display   = bData.gradient.on ? 'block' : 'none';
+        document.getElementById('grad-dir-wrap').style.display = (bData.gradient.type === 'radial') ? 'none' : 'block';
     }
 
     node.setAttr('bladeData', bData);
@@ -790,6 +821,8 @@ export function deleteSelectedNode() {
     setSelectedNodes([]);
     tr.nodes([]);
     hideInspector();
+    // 全要素が消えたら連番をリセット（次に作る要素が1から始まる）
+    if (layer.find('.ui-element').length === 0) setElementCount(0);
     renderExplorer();
     layer.batchDraw();
     saveHistory();

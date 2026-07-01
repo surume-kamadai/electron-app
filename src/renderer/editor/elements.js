@@ -67,6 +67,8 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         shadow:   'none',
         animation:'none',
         opacity:  1,
+        // グラデーション（off時は単色 bgcolor）。type: linear|radial, dir: v|h|d1|d2
+        gradient: { on: false, type: 'linear', c1: '#4facfe', c2: '#00f2fe', dir: 'v' },
         bgimage:  '',
         // フォーム用: Button の役割（'link' | 'submit'）
         role:     type === 'Button' ? 'link' : 'none',
@@ -269,6 +271,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
     if (typeof bData.opacity === 'number' && Number.isFinite(bData.opacity)) {
         newNode.opacity(Math.min(1, Math.max(0, bData.opacity)));
     }
+    applyGradient(newNode, bData);
 
     newNode.on('dragend transformend', () => {
         updateInspectorFromNode();
@@ -346,10 +349,17 @@ export function groupNodes() {
 }
 
 export function createEmptyFolder() {
+    // 現在選択中のレイヤー（同じ親階層のもの）を基準に、その「上」に作る
+    const ref = selectedNodes.find(n => n.parent === layer) || null;
     const node = spawnElement('Group');
     node.width(300);
     node.height(200);
+    // エクスプローラーは z 順の逆表示（上=高z）。選択レイヤーの1つ上に差し込む
+    if (ref && ref.parent === node.parent) {
+        node.setZIndex(Math.min(node.parent.getChildren().length - 1, ref.getZIndex() + 1));
+    }
     applySelectedNodes([node]);
+    renderExplorer();
     saveHistory();
     return node;
 }
@@ -422,6 +432,52 @@ export function applyNodeShadow(node, shadowType) {
         target.shadowBlur(s.blur);
         target.shadowOpacity(s.opacity);
     }
+}
+
+// グラデーション（線形/放射状）をノードへ適用。off なら単色塗りに戻す。
+// 対象: Rect / Circle / Triangle / Button(内部bg)。Image はDOMオーバーレイ側で描画する。
+export function applyGradient(node, bData) {
+    if (!node) return;
+    const type = node.getAttr('uiType');
+    let target = null;
+    if (type === 'Rect' || type === 'Circle' || type === 'Triangle') target = node;
+    else if (type === 'Button') target = node.findOne('.btn-bg');
+    if (!target || typeof target.fillLinearGradientColorStops !== 'function') return;
+
+    // いったん両グラデをクリア
+    target.fillLinearGradientColorStops(null);
+    target.fillRadialGradientColorStops(null);
+
+    const g = bData.gradient;
+    if (!g || !g.on) {
+        target.fillPriority('color');
+        target.fill(type === 'Button' ? (bData.bgimage ? null : bData.bgcolor) : bData.bgcolor);
+        node.getLayer()?.batchDraw();
+        return;
+    }
+
+    // 形状のローカル境界（Circleは中心原点）
+    let x0 = 0, y0 = 0, w = node.width(), h = node.height();
+    if (type === 'Circle') { const rx = node.radiusX(), ry = node.radiusY(); x0 = -rx; y0 = -ry; w = rx * 2; h = ry * 2; }
+
+    const c1 = g.c1 || '#4facfe', c2 = g.c2 || '#00f2fe';
+    if (g.type === 'radial') {
+        const cx = x0 + w / 2, cy = y0 + h / 2, R = Math.max(w, h) / 2 || 1;
+        target.fillRadialGradientStartPoint({ x: cx, y: cy });
+        target.fillRadialGradientEndPoint({ x: cx, y: cy });
+        target.fillRadialGradientStartRadius(0);
+        target.fillRadialGradientEndRadius(R);
+        target.fillRadialGradientColorStops([0, c1, 1, c2]);
+        target.fillPriority('radial-gradient');
+    } else {
+        const DIRS = { v: [[0.5, 0], [0.5, 1]], h: [[0, 0.5], [1, 0.5]], d1: [[0, 0], [1, 1]], d2: [[1, 0], [0, 1]] };
+        const [s, e] = DIRS[g.dir] || DIRS.v;
+        target.fillLinearGradientStartPoint({ x: x0 + s[0] * w, y: y0 + s[1] * h });
+        target.fillLinearGradientEndPoint({ x: x0 + e[0] * w, y: y0 + e[1] * h });
+        target.fillLinearGradientColorStops([0, c1, 1, c2]);
+        target.fillPriority('linear-gradient');
+    }
+    node.getLayer()?.batchDraw();
 }
 
 export function spawnComponent(componentName) {
