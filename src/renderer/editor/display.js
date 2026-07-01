@@ -5,6 +5,12 @@ import { stage, layer } from './canvas.js';
 import { setCurrentCanvasWidth, setCurrentCanvasHeight, currentDevice, setCurrentDevice } from './state.js'; 
 import { syncNodeToLayout } from './elements.js';
 import { updateInspectorFromNode } from './inspector.js';
+
+// Webフォント(Google Fonts)の読込完了後にキャンバスを再描画してテキストへ反映
+if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { try { layer.batchDraw(); } catch (e) {} });
+}
+
 // --- キャンバスサイズ・ズーム ---
 
 export function updateCanvasSize() {

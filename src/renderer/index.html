@@ -11,6 +11,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/golden-layout/1.5.9/css/goldenlayout-dark-theme.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/golden-layout/1.5.9/goldenlayout.min.js"></script>
     <link rel="stylesheet" href="editor.css">
+    <!-- 日本語Webフォント(Google Fonts) — エディタ表示用 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Serif+JP:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;700&family=Kosugi+Maru&family=Sawarabi+Mincho&family=Zen+Maru+Gothic:wght@400;700&family=Yusei+Magic&family=Dela+Gothic+One&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="workspace" id="workspace">
@@ -257,6 +261,44 @@
                             </select>
                         </div>
                     </div>
+
+                    <div id="group-dropshadow" style="margin-top:8px; border-top:1px solid #444; padding-top:8px;">
+                        <label><input type="checkbox" id="ins-ds-on" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 🌑 ドロップシャドウ（自由設定）</label>
+                        <div id="dropshadow-fields" style="display:none; margin-top:5px;">
+                            <div class="row">
+                                <div class="form-group">
+                                    <label>X（横px）</label>
+                                    <input type="number" id="ins-ds-x" value="4" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                                <div class="form-group">
+                                    <label>Y（縦px）</label>
+                                    <input type="number" id="ins-ds-y" value="4" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="form-group">
+                                    <label>ぼかし（px）</label>
+                                    <input type="number" id="ins-ds-blur" value="10" min="0" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                                <div class="form-group">
+                                    <label>広がり（px）</label>
+                                    <input type="number" id="ins-ds-spread" value="0" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="form-group">
+                                    <label>影の色</label>
+                                    <input type="color" id="ins-ds-color" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                                <div class="form-group">
+                                    <label>不透明度</label>
+                                    <input type="range" id="ins-ds-opacity" min="0" max="1" step="0.05" value="0.35" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                            </div>
+                            <div style="font-size:10px; color:#888;">テキストは「広がり」非対応（X/Y/ぼかしのみ）。上の「シャドウ(影)」プリセットより優先されます。</div>
+                        </div>
+                    </div>
+
                     <hr style="border-color:#444; margin:10px 0;">
                     <div class="form-group" id="group-text">
                         <label>テキスト内容</label>
@@ -266,10 +308,14 @@
                         <div class="form-group">
                             <label>背景色</label>
                             <input type="color" id="ins-bgcolor" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            <label style="font-size:10px; color:#aaa; margin-top:2px;">背景の透明度</label>
+                            <input type="range" id="ins-bg-alpha" min="0" max="1" step="0.05" value="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
                         </div>
                         <div class="form-group">
                             <label>文字色</label>
                             <input type="color" id="ins-color" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            <label style="font-size:10px; color:#aaa; margin-top:2px;">文字の透明度</label>
+                            <input type="range" id="ins-text-alpha" min="0" max="1" step="0.05" value="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
                         </div>
                     </div>
                     <div class="form-group">
@@ -280,6 +326,23 @@
                     <div class="form-group" id="group-corner" style="display:none;">
                         <label>角の丸み（px）</label>
                         <input type="range" id="ins-corner" min="0" max="150" step="1" value="0" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                    </div>
+
+                    <div id="group-stroke" style="display:none; border-top:1px solid #444; padding-top:8px; margin-top:6px;">
+                        <label><input type="checkbox" id="ins-stroke-on" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 🖊️ 境界線（枠線）</label>
+                        <div id="stroke-fields" style="display:none; margin-top:5px;">
+                            <div class="row">
+                                <div class="form-group">
+                                    <label>太さ（px）</label>
+                                    <input type="number" id="ins-stroke-width" min="0" max="50" step="1" value="2" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                                <div class="form-group">
+                                    <label>線の色</label>
+                                    <input type="color" id="ins-stroke-color" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                                </div>
+                            </div>
+                            <div style="font-size:10px; color:#888;">テキストは文字の縁取り（-webkit-text-stroke）になります</div>
+                        </div>
                     </div>
 
                     <div id="group-gradient" style="display:none; border-top:1px solid #444; padding-top:8px; margin-top:6px;">
@@ -334,9 +397,21 @@
                             <div class="form-group">
                                 <label>フォント</label>
                                 <select id="ins-fontfamily" onchange="onInspectorUpdate(true)">
-                                    <option value="sans-serif">ゴシック体</option>
-                                    <option value="serif">明朝体</option>
-                                    <option value="monospace">等幅フォント</option>
+                                    <optgroup label="標準">
+                                        <option value="sans-serif">ゴシック体</option>
+                                        <option value="serif">明朝体</option>
+                                        <option value="monospace">等幅フォント</option>
+                                    </optgroup>
+                                    <optgroup label="Google Fonts（日本語）">
+                                        <option value="'Noto Sans JP', sans-serif">Noto Sans JP（ゴシック）</option>
+                                        <option value="'Noto Serif JP', serif">Noto Serif JP（明朝）</option>
+                                        <option value="'M PLUS Rounded 1c', sans-serif">M PLUS Rounded 1c（丸ゴシック）</option>
+                                        <option value="'Zen Maru Gothic', sans-serif">Zen Maru Gothic（丸ゴ）</option>
+                                        <option value="'Kosugi Maru', sans-serif">Kosugi Maru（丸文字）</option>
+                                        <option value="'Sawarabi Mincho', serif">Sawarabi Mincho（明朝）</option>
+                                        <option value="'Yusei Magic', sans-serif">Yusei Magic（手書き風）</option>
+                                        <option value="'Dela Gothic One', sans-serif">Dela Gothic One（極太見出し）</option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>

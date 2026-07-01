@@ -5,7 +5,7 @@ import { layer, tr } from './canvas.js';
 import { selectedNodes, setSelectedNodes, currentDevice, setElementCount } from './state.js';
 import { saveHistory } from './history.js';
 import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius } from './elements.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, toRgba } from './elements.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { showToast } from './toast.js';
 
@@ -65,6 +65,10 @@ export function updateInspectorFromNode() {
     // ※ この行は必ず const bData の宣言より後に置くこと（TDZエラー防止）
     const opacityInput = document.getElementById('ins-opacity');
     if (opacityInput) opacityInput.value = bData.opacity ?? 1;
+    const bgAlphaEl = document.getElementById('ins-bg-alpha');
+    if (bgAlphaEl) bgAlphaEl.value = (bData.bgAlpha == null ? 1 : bData.bgAlpha);
+    const textAlphaEl = document.getElementById('ins-text-alpha');
+    if (textAlphaEl) textAlphaEl.value = (bData.textAlpha == null ? 1 : bData.textAlpha);
     document.getElementById('ins-align').value      = bData.align || 'left';
     document.getElementById('ins-fontfamily').value = bData.fontfamily || 'sans-serif';
     
@@ -184,6 +188,34 @@ export function updateInspectorFromNode() {
     document.getElementById('ins-shadow').value    = bData.shadow || 'none';
     document.getElementById('ins-animation').value = bData.animation || 'none';
 
+    // ▼ ドロップシャドウ（自由値）
+    const dsGroup = document.getElementById('group-dropshadow');
+    if (dsGroup) {
+        const d = bData.dropShadow || { on: false, x: 4, y: 4, blur: 10, spread: 0, color: '#000000', opacity: 0.35 };
+        document.getElementById('ins-ds-on').checked   = !!d.on;
+        document.getElementById('ins-ds-x').value       = parseFloat(d.x) || 0;
+        document.getElementById('ins-ds-y').value       = parseFloat(d.y) || 0;
+        document.getElementById('ins-ds-blur').value    = Math.max(0, parseFloat(d.blur) || 0);
+        document.getElementById('ins-ds-spread').value  = parseFloat(d.spread) || 0;
+        setColorInput('ins-ds-color', d.color, '#000000');
+        document.getElementById('ins-ds-opacity').value = Math.min(1, Math.max(0, d.opacity ?? 0.35));
+        document.getElementById('dropshadow-fields').style.display = d.on ? 'block' : 'none';
+    }
+
+    // ▼ 境界線（Stroke）: 四角・丸・ボタン・画像・テキストで表示
+    const strokeGroup = document.getElementById('group-stroke');
+    if (strokeGroup) {
+        const supportsStroke = ['Rect', 'Circle', 'Button', 'Image', 'Label'].includes(type);
+        strokeGroup.style.display = supportsStroke ? 'block' : 'none';
+        if (supportsStroke) {
+            const s = bData.stroke || { on: false, width: 2, color: '#000000' };
+            document.getElementById('ins-stroke-on').checked = !!s.on;
+            document.getElementById('ins-stroke-width').value = Math.max(0, parseFloat(s.width) || 0);
+            setColorInput('ins-stroke-color', s.color, '#000000');
+            document.getElementById('stroke-fields').style.display = s.on ? 'block' : 'none';
+        }
+    }
+
     // ▼ 角の丸み（四角・ボタン・画像で表示）
     const cornerGroup = document.getElementById('group-corner');
     if (cornerGroup) {
@@ -224,6 +256,8 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
     bData.text     = document.getElementById('ins-text').value;
     bData.bgcolor  = document.getElementById('ins-bgcolor').value;
     bData.color    = document.getElementById('ins-color').value;
+    bData.bgAlpha  = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-bg-alpha')?.value ?? 1)));
+    bData.textAlpha = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-text-alpha')?.value ?? 1)));
 
     // 不透明度: parseFloat が NaN を返しても ?? は NaN を素通りさせてしまうため、
     // Number.isFinite で判定し、0〜1にクランプする（不正値で要素が消えるのを防ぐ）。
@@ -256,6 +290,17 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
 
     bData.shadow    = document.getElementById('ins-shadow').value;
     bData.animation = document.getElementById('ins-animation').value;
+
+    // ドロップシャドウ(自由値)の保存
+    if (!bData.dropShadow) bData.dropShadow = {};
+    bData.dropShadow.on      = document.getElementById('ins-ds-on').checked;
+    bData.dropShadow.x       = parseFloat(document.getElementById('ins-ds-x').value) || 0;
+    bData.dropShadow.y       = parseFloat(document.getElementById('ins-ds-y').value) || 0;
+    bData.dropShadow.blur    = Math.max(0, parseFloat(document.getElementById('ins-ds-blur').value) || 0);
+    bData.dropShadow.spread  = parseFloat(document.getElementById('ins-ds-spread').value) || 0;
+    bData.dropShadow.color   = document.getElementById('ins-ds-color').value;
+    bData.dropShadow.opacity = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-ds-opacity').value) || 0));
+    document.getElementById('dropshadow-fields').style.display = bData.dropShadow.on ? 'block' : 'none';
 
     // フォーム関連の保存
     const roleSel = document.getElementById('ins-btn-role');
@@ -320,6 +365,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
     }
 
     applyNodeShadow(node, bData.shadow);
+    applyDropShadow(node, bData);  // on の時だけプリセットを上書き
     applyTextStyle(node, bData);
 
     node.x(parseInt(document.getElementById('ins-x').value));    
@@ -333,7 +379,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
 
     if (type === 'Label') {
         node.text(bData.text);
-        node.fill(bData.color);
+        node.fill(toRgba(bData.color, bData.textAlpha));
         node.fontSize(displayFontsize);
     } else if (type === 'Button') {
         const bg = node.findOne('.btn-bg');
@@ -353,7 +399,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
             txt.width(node.width());
             txt.height(node.height());
             txt.text(bData.text);
-            txt.fill(bData.color);
+            txt.fill(toRgba(bData.color, bData.textAlpha));
             txt.fontSize(displayFontsize);
         }
     } else if (type === 'Rect') {
@@ -373,6 +419,16 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
     if (['Rect', 'Button', 'Image'].includes(type)) {
         bData.cornerRadius = Math.max(0, parseInt(document.getElementById('ins-corner').value) || 0);
         applyCornerRadius(node, bData);
+    }
+
+    // 境界線(Stroke)の保存と適用
+    if (['Rect', 'Circle', 'Button', 'Image', 'Label'].includes(type)) {
+        if (!bData.stroke) bData.stroke = {};
+        bData.stroke.on    = document.getElementById('ins-stroke-on').checked;
+        bData.stroke.width = Math.max(0, parseFloat(document.getElementById('ins-stroke-width').value) || 0);
+        bData.stroke.color = document.getElementById('ins-stroke-color').value;
+        applyStroke(node, bData);
+        document.getElementById('stroke-fields').style.display = bData.stroke.on ? 'block' : 'none';
     }
 
     // グラデーション設定の保存と適用（単色塗りの後に上書き）

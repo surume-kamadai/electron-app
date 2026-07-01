@@ -3,8 +3,8 @@
 // ステージ操作 / キーボード / パネルドラッグ / 画像D&D / 右クリック
 // ============================================================
 import { stage, layer, tr, selectionRect } from './canvas.js';
-import {selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
-import { getNextElementCount,  applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient } from './elements.js';
+import { selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
+import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient, nextNumberForType, makeTypeCounter } from './elements.js';
 import { saveHistory, undo, redo } from './history.js';
 import { updateInspectorFromNode, deleteSelectedNode } from './inspector.js';
 import { renderExplorer } from './explorer.js';
@@ -13,6 +13,7 @@ import { showToast } from './toast.js';
 import { processNode } from './converter.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { exitWarpMode, isWarpMode, getWarpTarget } from './warp.js';
+
 // ============================================================
 // ステージ: トランスフォーム完了時のグループスケール正規化
 // ============================================================
@@ -568,12 +569,12 @@ function pasteClipboard() {
     if (clipboardData.length === 0) return;
     applySelectedNodes([]);
 
-    const idMap = {}; 
-    const tempMap = {}; // ★ 追加
+    // 旧ID → 新ID のマップ（イベントターゲット再マッピング用）
+    const idMap = new Map();
+    const nextNum = makeTypeCounter(); // タイプごとに連番で払い出す
 
     function regenerateIds(data, isRoot) {
-        const count = getNextElementCount(data.type, tempMap);
-        const newId = data.type.toLowerCase() + '_' + count;
+        const newId = data.type.toLowerCase() + '_' + nextNum(data.type);
         idMap.set(data.id, newId);
         data.id = newId;
         if (isRoot) {
@@ -652,7 +653,7 @@ document.getElementById('workspace').addEventListener('drop', async e => {
         // spawnElement('Image', loadData) を再利用し、ツールボタン経由と同一の
         // bladeData 構造（_pcGeom / layouts / events 等を含む）で生成する。
         // これでレスポンシブ出力やシリアライズの不整合を防ぐ。
-        const count = incrementElementCount();
+        const count = nextNumberForType('Image');
         const loadData = {
             id: 'image_' + count,
             transform: { x: x > 0 ? x : 50, y: y > 0 ? y : 50, width: w, height: h },
