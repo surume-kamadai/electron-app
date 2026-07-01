@@ -381,7 +381,9 @@ stage.on('mouseup touchend', e => {
     const newSelected = layer.getChildren().filter(
         node => node.hasName('ui-element') && Konva.Util.haveIntersection(box, node.getClientRect())
     );
+    // バンドで要素を掴めた→選択、何も掴めなかった（＝空白クリック/空バンド）→単体含め選択解除
     if (newSelected.length > 0) applySelectedNodes(newSelected);
+    else applySelectedNodes([]);
 });
 
 // クリックで要素選択

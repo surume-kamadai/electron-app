@@ -2,7 +2,7 @@
 // インスペクター (プロパティパネル)
 // ============================================================
 import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
+import { selectedNodes, setSelectedNodes, currentDevice, setElementCount } from './state.js';
 import { saveHistory } from './history.js';
 import { renderExplorer } from './explorer.js';
 import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient } from './elements.js';
@@ -821,6 +821,8 @@ export function deleteSelectedNode() {
     setSelectedNodes([]);
     tr.nodes([]);
     hideInspector();
+    // 全要素が消えたら連番をリセット（次に作る要素が1から始まる）
+    if (layer.find('.ui-element').length === 0) setElementCount(0);
     renderExplorer();
     layer.batchDraw();
     saveHistory();

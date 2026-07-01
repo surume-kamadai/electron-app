@@ -349,10 +349,17 @@ export function groupNodes() {
 }
 
 export function createEmptyFolder() {
+    // 現在選択中のレイヤー（同じ親階層のもの）を基準に、その「上」に作る
+    const ref = selectedNodes.find(n => n.parent === layer) || null;
     const node = spawnElement('Group');
     node.width(300);
     node.height(200);
+    // エクスプローラーは z 順の逆表示（上=高z）。選択レイヤーの1つ上に差し込む
+    if (ref && ref.parent === node.parent) {
+        node.setZIndex(Math.min(node.parent.getChildren().length - 1, ref.getZIndex() + 1));
+    }
     applySelectedNodes([node]);
+    renderExplorer();
     saveHistory();
     return node;
 }

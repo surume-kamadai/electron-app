@@ -15,6 +15,7 @@ export function setCurrentCanvasWidth(v)  { currentCanvasWidth  = v; }
 export function setCurrentCanvasHeight(v) { currentCanvasHeight = v; }
 export function setSelectedNodes(nodes)   { selectedNodes = nodes; }
 export function incrementElementCount()   { elementCount++; return elementCount; }
+export function setElementCount(v)         { elementCount = v; }
 // --- デバイス（レスポンシブ）状態 ---
 export let currentDevice = 'pc'; // 'pc' または 'mobile'
 export function setCurrentDevice(v) { currentDevice = v; }
