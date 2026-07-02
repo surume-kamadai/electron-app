@@ -1,24 +1,14 @@
 // ============================================================
 // インスペクター (プロパティパネル)
 // ============================================================
-import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
-import { saveHistory } from './history.js';
-import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, applyGradText, applyGlow } from './elements.js';
-import { markMobileEdited, updatePcGeom } from './display.js';
-import { showToast } from './toast.js';
-
-// 画像をダイアログから取得（api.js への循環参照を避けるためローカルに実装）
-async function pickImageDialog() {
-    try {
-        const result = await window.electronAPI.pickImage();
-        return result?.dataUrl ?? null;
-    } catch {
-        showToast('画像の選択に失敗しました。', null, true);
-        return null;
-    }
-}
+import { layer, tr } from '../canvas/canvas.js';
+import { selectedNodes, setSelectedNodes, currentDevice } from '../app/state.js';
+import { saveHistory } from '../history/history.js';
+import { renderExplorer } from '../explorer/explorer.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, applyGradText, applyGlow } from '../nodes/node-style.js';
+import { markMobileEdited, updatePcGeom } from '../canvas/display.js';
+import { pickImageDialog } from './image-picker.js';
+import { renderEventList } from './interactions.js';
 
 // type=color 入力に安全に値を設定する（#rrggbb 以外は既定値にフォールバック）
 function setColorInput(id, val, def) {
@@ -34,7 +24,13 @@ function setColorInput(id, val, def) {
 }
 
 
+// いま各入力フィールドが表しているノードのid。
+// 選択直後などに、まだ前ノードの値が残ったフィールドで onInspectorUpdate が
+// 走って設定が別オブジェクトへ「移ってしまう」のを防ぐためのガードに使う。
+let inspectorNodeId = null;
+
 export function hideInspector() {
+    inspectorNodeId = null;
     document.getElementById('ins-fields').style.display = 'none';
     document.getElementById('ins-empty').style.display  = 'block';
 }
@@ -46,6 +42,7 @@ export function updateInspectorFromNode() {
     document.getElementById('ins-empty').style.display  = 'none';
 
     if (selectedNodes.length > 1) {
+        inspectorNodeId = null;
         document.getElementById('ins-fields-single').style.display = 'none';
         document.getElementById('ins-fields-multi').style.display  = 'block';
         return;
@@ -55,6 +52,8 @@ export function updateInspectorFromNode() {
     document.getElementById('ins-fields-multi').style.display  = 'none';
 
     const node  = selectedNodes[0];
+    // これ以降のフィールドはこのノードの値で埋める（ガード用に記録）
+    inspectorNodeId = node.id();
     const bData = node.getAttr('bladeData');
     const type  = node.getAttr('uiType');
 
@@ -325,6 +324,12 @@ export function updateInspectorFromNode() {
 export function onInspectorUpdate(shouldSaveHistory = true) {
     if (selectedNodes.length !== 1) return;
     const node  = selectedNodes[0];
+
+    // フィールドがまだこのノードの値で埋まっていない（＝選択直後に前ノード由来の
+    // stale なイベントが来た）場合は書き込まず、正しい値で作り直す。
+    // これで「Aの設定を触った直後にBを選ぶとBへ移る」現象を防ぐ。
+    if (inspectorNodeId !== node.id()) { updateInspectorFromNode(); return; }
+
     const bData = node.getAttr('bladeData');
 
     bData.name     = document.getElementById('ins-name').value;
@@ -534,7 +539,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
         document.getElementById('gradtext-fields').style.display = bData.gradText.on ? 'block' : 'none';
     }
 
-    // 内側シャドウ / ベベル（Konva非対応のため出力CSSで反映。エディタ表示は近似なし）
+    // 内側シャドウ / ベベル（Konva非対応。effect-overlay.js のDOM層でプレビュー＋出力CSSで反映）
     if (['Rect', 'Circle', 'Button', 'Image'].includes(type)) {
         if (!bData.innerShadow) bData.innerShadow = {};
         bData.innerShadow.on      = document.getElementById('ins-is-on').checked;
@@ -629,386 +634,6 @@ window.clearButtonBgImage = () => {
     saveHistory();
 };
 
-// ============================================================
-// スライダー編集モーダル（画像+タイトル+本文+リンクをスライドごとに編集）
-// ============================================================
-
-// スライド/アイテム配列を取得（Slider→slider.slides, ArticleGrid→grid.items）
-function getSlides(node) {
-    const bData = node.getAttr('bladeData');
-    const type = node.getAttr('uiType');
-    if (type === 'ArticleGrid') {
-        if (!bData.grid) bData.grid = {};
-        if (!Array.isArray(bData.grid.items)) bData.grid.items = [];
-        return bData.grid.items;
-    }
-    // Slider
-    if (!bData.slider) bData.slider = {};
-    if (!Array.isArray(bData.slider.slides)) {
-        // 旧データ: text に画像URLがカンマ区切り → 新スキーマに変換
-        const legacy = (bData.text || '').split(',').map(s => s.trim()).filter(Boolean);
-        bData.slider.slides = legacy.map(url => ({ image: url, title: '', text: '', linkType: 'none', link: '' }));
-    }
-    return bData.slider.slides;
-}
-
-function saveSlides(node, slides) {
-    const bData = node.getAttr('bladeData');
-    const type = node.getAttr('uiType');
-    if (type === 'ArticleGrid') {
-        bData.grid = bData.grid || {};
-        bData.grid.items = slides;
-    } else {
-        bData.slider = bData.slider || {};
-        bData.slider.slides = slides;
-    }
-    node.setAttr('bladeData', bData);
-}
-
-// 現在のプロジェクトのページ一覧を取得（リンク先候補）
-function getPageOptions() {
-    // 動的import避け: window 経由で project からページ一覧を取りに行く
-    try {
-        const proj = window.__getProjectPagesForSlider?.();
-        return proj || [];
-    } catch { return []; }
-}
-
-// モーダルの再描画
-function renderSliderEditor(node) {
-    const list = document.getElementById('slider-editor-list');
-    if (!list) return;
-    list.innerHTML = '';
-
-    const slides = getSlides(node);
-    const pages  = getPageOptions();
-
-    slides.forEach((sl, idx) => {
-        const card = document.createElement('div');
-        card.style.cssText = 'display:flex; gap:10px; padding:10px; background:#2d2d2d; border:1px solid #444; border-radius:5px; margin-bottom:8px;';
-
-        // 左: 画像プレビュー+選択
-        const left = document.createElement('div');
-        left.style.cssText = 'width:120px; flex-shrink:0;';
-        const thumb = document.createElement('div');
-        thumb.style.cssText = 'width:120px; height:80px; background:#1e1e1e; border:2px dashed #555; border-radius:3px; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer; color:#888; font-size:11px; text-align:center;';
-        if (sl.image) {
-            const img = document.createElement('img');
-            img.src = sl.image;
-            img.style.cssText = 'width:100%; height:100%; object-fit:cover;';
-            img.onerror = () => { thumb.innerText = '画像エラー'; };
-            thumb.innerHTML = ''; thumb.appendChild(img);
-        } else {
-            thumb.innerText = 'クリック or D&D\nで画像追加';
-        }
-        // クリックでファイルダイアログ
-        thumb.onclick = async () => {
-            const dataUrl = await pickImageDialog();
-            if (dataUrl) { sl.image = dataUrl; saveSlides(node, slides); renderSliderEditor(node); saveHistory(); }
-        };
-        // D&D
-        thumb.ondragover = e => { e.preventDefault(); thumb.style.borderColor = '#007acc'; };
-        thumb.ondragleave = () => { thumb.style.borderColor = '#555'; };
-        thumb.ondrop = async e => {
-            e.preventDefault();
-            thumb.style.borderColor = '#555';
-            const file = e.dataTransfer.files?.[0];
-            if (!file || !file.type.startsWith('image/')) return;
-            const dataUrl = await new Promise(res => {
-                const r = new FileReader();
-                r.onload = ev => res(ev.target.result);
-                r.readAsDataURL(file);
-            });
-            sl.image = dataUrl;
-            saveSlides(node, slides);
-            renderSliderEditor(node);
-            saveHistory();
-        };
-        left.appendChild(thumb);
-
-        const numLabel = document.createElement('div');
-        numLabel.style.cssText = 'font-size:10px; color:#aaa; margin-top:4px; text-align:center;';
-        numLabel.innerText = `スライド ${idx + 1}`;
-        left.appendChild(numLabel);
-
-        card.appendChild(left);
-
-        // 右: タイトル・本文・リンク
-        const right = document.createElement('div');
-        right.style.cssText = 'flex:1; display:flex; flex-direction:column; gap:5px;';
-
-        const titleIn = document.createElement('input');
-        titleIn.type = 'text';
-        titleIn.placeholder = 'タイトル（見出し）';
-        titleIn.value = sl.title || '';
-        titleIn.style.cssText = 'padding:5px; background:#1e1e1e; color:#fff; border:1px solid #555; border-radius:3px; font-size:12px;';
-        titleIn.oninput = () => { sl.title = titleIn.value; saveSlides(node, slides); };
-        titleIn.onchange = () => saveHistory();
-        right.appendChild(titleIn);
-
-        const textIn = document.createElement('textarea');
-        textIn.placeholder = '本文';
-        textIn.value = sl.text || '';
-        textIn.rows = 2;
-        textIn.style.cssText = 'padding:5px; background:#1e1e1e; color:#fff; border:1px solid #555; border-radius:3px; font-size:12px; resize:vertical;';
-        textIn.oninput = () => { sl.text = textIn.value; saveSlides(node, slides); };
-        textIn.onchange = () => saveHistory();
-        right.appendChild(textIn);
-
-        // リンク種別 + リンク先
-        const linkRow = document.createElement('div');
-        linkRow.style.cssText = 'display:flex; gap:5px;';
-
-        const linkSel = document.createElement('select');
-        linkSel.style.cssText = 'padding:4px; background:#1e1e1e; color:#fff; border:1px solid #555; border-radius:3px; font-size:11px; min-width:90px;';
-        ['none','url','page'].forEach(v => {
-            const opt = document.createElement('option');
-            opt.value = v;
-            opt.innerText = v === 'none' ? 'リンクなし' : v === 'url' ? '外部URL' : '内部ページ';
-            if ((sl.linkType || 'none') === v) opt.selected = true;
-            linkSel.appendChild(opt);
-        });
-
-        const buildLinkInput = () => {
-            const old = linkRow.querySelector('.slider-link-target');
-            if (old) old.remove();
-            const t = linkSel.value;
-            if (t === 'none') return;
-            let el;
-            if (t === 'page') {
-                el = document.createElement('select');
-                pages.forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.path;
-                    opt.innerText = p.name;
-                    if (sl.link === p.path) opt.selected = true;
-                    el.appendChild(opt);
-                });
-                el.onchange = () => { sl.link = el.value; saveSlides(node, slides); saveHistory(); };
-            } else {
-                el = document.createElement('input');
-                el.type = 'text';
-                el.placeholder = 'https://example.com';
-                el.value = sl.link || '';
-                el.oninput = () => { sl.link = el.value; saveSlides(node, slides); };
-                el.onchange = () => saveHistory();
-            }
-            el.className = 'slider-link-target';
-            el.style.cssText = 'flex:1; padding:4px; background:#1e1e1e; color:#fff; border:1px solid #555; border-radius:3px; font-size:11px;';
-            linkRow.appendChild(el);
-        };
-
-        linkSel.onchange = () => {
-            sl.linkType = linkSel.value;
-            if (sl.linkType === 'none') sl.link = '';
-            saveSlides(node, slides);
-            buildLinkInput();
-            saveHistory();
-        };
-        linkRow.appendChild(linkSel);
-        buildLinkInput();
-        right.appendChild(linkRow);
-
-        card.appendChild(right);
-
-        // 右端: 上下/削除
-        const actions = document.createElement('div');
-        actions.style.cssText = 'display:flex; flex-direction:column; gap:3px;';
-        const upBtn = document.createElement('button');
-        upBtn.innerText = '↑'; upBtn.title = '上へ';
-        upBtn.style.cssText = 'width:28px; padding:2px; background:#444; border:none; color:#fff; margin:0; font-size:11px;';
-        upBtn.onclick = () => {
-            if (idx === 0) return;
-            [slides[idx - 1], slides[idx]] = [slides[idx], slides[idx - 1]];
-            saveSlides(node, slides); renderSliderEditor(node); saveHistory();
-        };
-        const downBtn = document.createElement('button');
-        downBtn.innerText = '↓'; downBtn.title = '下へ';
-        downBtn.style.cssText = 'width:28px; padding:2px; background:#444; border:none; color:#fff; margin:0; font-size:11px;';
-        downBtn.onclick = () => {
-            if (idx === slides.length - 1) return;
-            [slides[idx + 1], slides[idx]] = [slides[idx], slides[idx + 1]];
-            saveSlides(node, slides); renderSliderEditor(node); saveHistory();
-        };
-        const delBtn = document.createElement('button');
-        delBtn.innerText = '✕'; delBtn.title = '削除';
-        delBtn.style.cssText = 'width:28px; padding:2px; background:#cc4545; border:none; color:#fff; margin:0; font-size:11px;';
-        delBtn.onclick = () => {
-            slides.splice(idx, 1);
-            saveSlides(node, slides); renderSliderEditor(node); saveHistory();
-        };
-        actions.appendChild(upBtn);
-        actions.appendChild(downBtn);
-        actions.appendChild(delBtn);
-        card.appendChild(actions);
-
-        list.appendChild(card);
-    });
-
-    if (slides.length === 0) {
-        const empty = document.createElement('div');
-        empty.style.cssText = 'color:#888; font-size:12px; padding:20px; text-align:center;';
-        empty.innerText = 'スライドがありません。下の「＋ スライドを追加」で追加してください。';
-        list.appendChild(empty);
-    }
-}
-
-let editorTargetNode = null;
-
-window.openSliderEditor = () => {
-    if (selectedNodes.length !== 1) return;
-    const node = selectedNodes[0];
-    if (node.getAttr('uiType') !== 'Slider') return;
-    editorTargetNode = node;
-    document.getElementById('slider-editor-title').innerText = '📋 スライド一覧の編集';
-    document.getElementById('slider-editor-overlay').style.display = 'flex';
-    renderSliderEditor(node);
-};
-
-window.openGridEditor = () => {
-    if (selectedNodes.length !== 1) return;
-    const node = selectedNodes[0];
-    if (node.getAttr('uiType') !== 'ArticleGrid') return;
-    editorTargetNode = node;
-    document.getElementById('slider-editor-title').innerText = '📋 記事アイテム一覧の編集';
-    document.getElementById('slider-editor-overlay').style.display = 'flex';
-    renderSliderEditor(node);
-};
-
-window.closeSliderEditor = () => {
-    document.getElementById('slider-editor-overlay').style.display = 'none';
-    if (editorTargetNode) {
-        const type = editorTargetNode.getAttr('uiType');
-        if (type === 'Slider') {
-            const placeholder = editorTargetNode.findOne('.slider-placeholder');
-            if (placeholder) {
-                const count = (editorTargetNode.getAttr('bladeData')?.slider?.slides || []).length;
-                placeholder.text(`🖼️ スライダー\n(現在 ${count} 枚のスライド)\n📋「スライド一覧を編集」で詳細設定`);
-                editorTargetNode.getLayer()?.batchDraw();
-            }
-        } else if (type === 'ArticleGrid') {
-            const placeholder = editorTargetNode.findOne('.grid-placeholder');
-            if (placeholder) {
-                const bData = editorTargetNode.getAttr('bladeData');
-                const count = (bData?.grid?.items || []).length;
-                const cols  = bData?.grid?.columns ?? 3;
-                placeholder.text(`📰 記事グリッド\n(${count} 件 / ${cols} カラム)\n📋「アイテム一覧を編集」で詳細設定`);
-                editorTargetNode.getLayer()?.batchDraw();
-            }
-        }
-    }
-    editorTargetNode = null;
-};
-
-window.addNewSlide = () => {
-    if (!editorTargetNode) return;
-    const slides = getSlides(editorTargetNode);
-    slides.push({ image: '', title: '', text: '', linkType: 'none', link: '' });
-    saveSlides(editorTargetNode, slides);
-    renderSliderEditor(editorTargetNode);
-    saveHistory();
-};
-
-// ============================================================
-// アコーディオン項目編集モーダル
-// ============================================================
-let accordionTargetNode = null;
-
-function getAccordionItems(node) {
-    const bData = node.getAttr('bladeData');
-    if (!bData.accordion) bData.accordion = {};
-    if (!Array.isArray(bData.accordion.items)) bData.accordion.items = [];
-    return bData.accordion.items;
-}
-
-function renderAccordionEditor(node) {
-    const list = document.getElementById('accordion-editor-list');
-    if (!list) return;
-    list.innerHTML = '';
-    const items = getAccordionItems(node);
-
-    items.forEach((it, idx) => {
-        const card = document.createElement('div');
-        card.style.cssText = 'padding:10px; background:#2d2d2d; border:1px solid #444; border-radius:5px; margin-bottom:8px;';
-
-        const head = document.createElement('div');
-        head.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:6px;';
-        const num = document.createElement('span');
-        num.innerText = `項目 ${idx + 1}`;
-        num.style.cssText = 'font-size:11px; color:#aaa; flex:1;';
-
-        const upBtn = document.createElement('button');
-        upBtn.innerText = '↑'; upBtn.style.cssText = 'width:26px; padding:2px; background:#444; border:none; color:#fff; margin:0; font-size:11px;';
-        upBtn.onclick = () => { if (idx===0) return; [items[idx-1],items[idx]]=[items[idx],items[idx-1]]; node.setAttr('bladeData', node.getAttr('bladeData')); renderAccordionEditor(node); saveHistory(); };
-        const downBtn = document.createElement('button');
-        downBtn.innerText = '↓'; downBtn.style.cssText = 'width:26px; padding:2px; background:#444; border:none; color:#fff; margin:0; font-size:11px;';
-        downBtn.onclick = () => { if (idx===items.length-1) return; [items[idx+1],items[idx]]=[items[idx],items[idx+1]]; node.setAttr('bladeData', node.getAttr('bladeData')); renderAccordionEditor(node); saveHistory(); };
-        const delBtn = document.createElement('button');
-        delBtn.innerText = '✕'; delBtn.style.cssText = 'width:26px; padding:2px; background:#cc4545; border:none; color:#fff; margin:0; font-size:11px;';
-        delBtn.onclick = () => { items.splice(idx,1); node.setAttr('bladeData', node.getAttr('bladeData')); renderAccordionEditor(node); saveHistory(); };
-
-        head.appendChild(num); head.appendChild(upBtn); head.appendChild(downBtn); head.appendChild(delBtn);
-        card.appendChild(head);
-
-        const titleIn = document.createElement('input');
-        titleIn.type = 'text';
-        titleIn.placeholder = '質問・見出し';
-        titleIn.value = it.title || '';
-        titleIn.style.cssText = 'width:100%; padding:6px; background:#1e1e1e; color:#fff; border:1px solid #555; border-radius:3px; font-size:12px; margin-bottom:5px; box-sizing:border-box;';
-        titleIn.oninput = () => { it.title = titleIn.value; node.setAttr('bladeData', node.getAttr('bladeData')); };
-        titleIn.onchange = () => saveHistory();
-        card.appendChild(titleIn);
-
-        const contentIn = document.createElement('textarea');
-        contentIn.placeholder = '回答・本文';
-        contentIn.value = it.content || '';
-        contentIn.rows = 3;
-        contentIn.style.cssText = 'width:100%; padding:6px; background:#1e1e1e; color:#fff; border:1px solid #555; border-radius:3px; font-size:12px; resize:vertical; box-sizing:border-box;';
-        contentIn.oninput = () => { it.content = contentIn.value; node.setAttr('bladeData', node.getAttr('bladeData')); };
-        contentIn.onchange = () => saveHistory();
-        card.appendChild(contentIn);
-
-        list.appendChild(card);
-    });
-
-    if (items.length === 0) {
-        const empty = document.createElement('div');
-        empty.style.cssText = 'color:#888; font-size:12px; padding:20px; text-align:center;';
-        empty.innerText = '項目がありません。下の「＋ 項目を追加」で追加してください。';
-        list.appendChild(empty);
-    }
-}
-
-window.openAccordionEditor = () => {
-    if (selectedNodes.length !== 1) return;
-    const node = selectedNodes[0];
-    if (node.getAttr('uiType') !== 'Accordion') return;
-    accordionTargetNode = node;
-    document.getElementById('accordion-editor-overlay').style.display = 'flex';
-    renderAccordionEditor(node);
-};
-
-window.closeAccordionEditor = () => {
-    document.getElementById('accordion-editor-overlay').style.display = 'none';
-    if (accordionTargetNode) {
-        const placeholder = accordionTargetNode.findOne('.accordion-placeholder');
-        if (placeholder) {
-            const count = (accordionTargetNode.getAttr('bladeData')?.accordion?.items || []).length;
-            placeholder.text(`🪗 アコーディオン\n(${count} 項目)\n📋「項目一覧を編集」で詳細設定`);
-            accordionTargetNode.getLayer()?.batchDraw();
-        }
-    }
-    accordionTargetNode = null;
-};
-
-window.addAccordionItem = () => {
-    if (!accordionTargetNode) return;
-    const items = getAccordionItems(accordionTargetNode);
-    items.push({ title: '新しい質問', content: '回答を入力してください。' });
-    accordionTargetNode.setAttr('bladeData', accordionTargetNode.getAttr('bladeData'));
-    renderAccordionEditor(accordionTargetNode);
-    saveHistory();
-};
 
 export function deleteSelectedNode() {
     if (selectedNodes.length === 0) return;
@@ -1068,122 +693,3 @@ export function distributeNodes(axis) {
     renderExplorer();
     saveHistory();
 }
-
-// ============================================================
-// ⚡ インタラクション (イベントトリガー) の管理
-// ============================================================
-
-// 現在のキャンバスにある全ての要素から、ターゲット候補(IDと名前)のリストを取得
-function getTargetOptions(currentId) {
-    const options = [{ id: '', name: '-- ターゲットを選択 --' }];
-    layer.getChildren().forEach(n => {
-        if (n.hasName('ui-element') && n.id() !== currentId) {
-            const bData = n.getAttr('bladeData');
-            const type = n.getAttr('uiType');
-            options.push({ id: n.id(), name: `${bData.name} (${type})` });
-        }
-    });
-    return options;
-}
-
-// イベントリストの再描画
-export function renderEventList(node) {
-    const listEl = document.getElementById('ins-events-list');
-    if (!listEl) return;
-    listEl.innerHTML = '';
-
-    const bData = node.getAttr('bladeData');
-    const events = bData.events || [];
-    const targetOptions = getTargetOptions(node.id());
-
-    events.forEach((ev, index) => {
-        const div = document.createElement('div');
-        div.style.cssText = 'background: #252526; border: 1px solid #444; padding: 5px; margin-bottom: 5px; border-radius: 3px; position: relative;';
-
-        // 削除ボタン
-        const delBtn = document.createElement('button');
-        delBtn.innerText = '✕';
-        delBtn.style.cssText = 'position: absolute; top: 2px; right: 2px; width: 20px; padding: 0; background: none; border: none; color: #cc4545; font-size: 12px; margin: 0;';
-        delBtn.onclick = () => {
-            bData.events.splice(index, 1);
-            node.setAttr('bladeData', bData);
-            renderEventList(node);
-            saveHistory();
-        };
-        div.appendChild(delBtn);
-
-        // トリガー選択 (いつ)
-        const row1 = document.createElement('div');
-        row1.className = 'form-group'; row1.style.marginBottom = '3px';
-        row1.innerHTML = `<label style="margin:0; font-size:10px;">いつ？ (Trigger)</label>
-            <select class="ev-trigger" style="padding: 2px;">
-                <option value="click" ${ev.trigger === 'click' ? 'selected' : ''}>クリック時 (OnClick)</option>
-                <option value="hover" ${ev.trigger === 'hover' ? 'selected' : ''}>マウスホバー時 (OnHover)</option>
-            </select>`;
-        
-        // アクション選択 (どうする)
-        const row2 = document.createElement('div');
-        row2.className = 'form-group'; row2.style.marginBottom = '3px';
-        row2.innerHTML = `<label style="margin:0; font-size:10px;">どうする？ (Action)</label>
-            <select class="ev-action" style="padding: 2px;">
-                <option value="show" ${ev.action === 'show' ? 'selected' : ''}>表示する (Show)</option>
-                <option value="hide" ${ev.action === 'hide' ? 'selected' : ''}>隠す (Hide)</option>
-                <option value="toggle" ${ev.action === 'toggle' ? 'selected' : ''}>表示/非表示を切り替え</option>
-                <option value="alert" ${ev.action === 'alert' ? 'selected' : ''}>アラートを出す</option>
-            </select>`;
-
-        // ターゲット選択 / テキスト入力 (どれを)
-        const row3 = document.createElement('div');
-        row3.className = 'form-group'; row3.style.marginBottom = '0';
-        
-        if (ev.action === 'alert') {
-            row3.innerHTML = `<label style="margin:0; font-size:10px;">メッセージ (Text)</label>
-                <input type="text" class="ev-target" value="${ev.target}" placeholder="アラートの文章" style="padding: 2px;">`;
-        } else {
-            let optionsHtml = targetOptions.map(opt => 
-                `<option value="${opt.id}" ${ev.target === opt.id ? 'selected' : ''}>${opt.name}</option>`
-            ).join('');
-            row3.innerHTML = `<label style="margin:0; font-size:10px;">対象要素 (Target)</label>
-                <select class="ev-target" style="padding: 2px;">${optionsHtml}</select>`;
-        }
-
-        div.appendChild(row1);
-        div.appendChild(row2);
-        div.appendChild(row3);
-
-        // 値が変更されたら保存
-        div.querySelectorAll('select, input').forEach(input => {
-            input.onchange = () => {
-                ev.trigger = div.querySelector('.ev-trigger').value;
-                ev.action = div.querySelector('.ev-action').value;
-                ev.target = div.querySelector('.ev-target').value;
-                
-                // アクションが変わった時は対象の入力UIを再描画
-                if (input.classList.contains('ev-action')) {
-                    ev.target = ''; // リセット
-                    renderEventList(node);
-                } else {
-                    node.setAttr('bladeData', bData);
-                }
-                saveHistory();
-            };
-        });
-
-        listEl.appendChild(div);
-    });
-}
-
-// ボタンから呼び出される「イベント追加」
-window.addEventTrigger = () => {
-    if (selectedNodes.length !== 1) return;
-    const node = selectedNodes[0];
-    const bData = node.getAttr('bladeData');
-    if (!bData.events) bData.events = [];
-    
-    // デフォルトのイベントを追加
-    bData.events.push({ trigger: 'click', action: 'toggle', target: '' });
-    node.setAttr('bladeData', bData);
-    
-    renderEventList(node);
-    saveHistory();
-};

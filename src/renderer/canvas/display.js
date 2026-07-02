@@ -2,9 +2,9 @@
 // キャンバスサイズ / ズーム / パンニング
 // ============================================================
 import { stage, layer } from './canvas.js';
-import { setCurrentCanvasWidth, setCurrentCanvasHeight, currentDevice, setCurrentDevice, selectedNodes } from './state.js';
-import { syncNodeToLayout, applySelectedNodes } from './elements.js';
-import { updateInspectorFromNode } from './inspector.js';
+import { setCurrentCanvasWidth, setCurrentCanvasHeight, currentDevice, setCurrentDevice, selectedNodes } from '../app/state.js';
+import { syncNodeToLayout, applySelectedNodes } from '../nodes/elements.js';
+import { updateInspectorFromNode } from '../inspector/inspector.js';
 
 // Webフォント(Google Fonts)の読込完了後にキャンバスを再描画してテキストへ反映
 if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {

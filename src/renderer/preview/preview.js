@@ -1,9 +1,9 @@
 // ============================================================
 // preview.js - エディタ内プレビュー（プレイモード）機能
 // ============================================================
-import { getProject, getActivePage, saveCurrentPage } from './project.js';
-import { currentDevice } from './state.js';
-import { HtmlRenderer } from '../renderer.js'; // 出力エンジンを直接呼ぶ
+import { getProject, getActivePage, saveCurrentPage } from '../project/project.js';
+import { currentDevice } from '../app/state.js';
+import { HtmlRenderer } from '../export/renderer.js'; // 出力エンジンを直接呼ぶ
 
 export function playPreview() {
     // 1. 最新の配置を page.elements に確定保存する（generateSceneData経由で

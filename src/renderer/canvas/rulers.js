@@ -15,7 +15,7 @@
 //   - 📏ボタン（toggleRulers）で表示/非表示
 // ============================================================
 import { stage } from './canvas.js';
-import { currentCanvasWidth, currentCanvasHeight } from './state.js';
+import { currentCanvasWidth, currentCanvasHeight } from '../app/state.js';
 
 const RULER = 18;              // 定規の太さ(px)
 const guidesX = [];            // 縦ガイドの x 座標（canvas基準）

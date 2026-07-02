@@ -5,10 +5,10 @@
 // 各ページは elements の配列を持つ。
 // ページ切替時は、現在のキャンバスを保存→別ページを読込する。
 // ============================================================
-import { layer, tr } from './canvas.js';
-import { setSelectedNodes } from './state.js';
-import { generateSceneData } from './converter.js';
-import { hideInspector } from './inspector.js';
+import { layer, tr } from '../canvas/canvas.js';
+import { setSelectedNodes } from '../app/state.js';
+import { generateSceneData } from '../nodes/converter.js';
+import { hideInspector } from '../inspector/inspector.js';
 
 // 循環参照を避けるため、spawnElement と renderExplorer は
 // 外部から init() で登録する方式にする

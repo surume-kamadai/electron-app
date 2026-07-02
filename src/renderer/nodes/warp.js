@@ -6,8 +6,8 @@
 // 四角形(4点)、三角形(3点)、円(12点の近似ポリゴン) に対応。
 // 出力時は clip-path: polygon() で形を再現する。
 // ============================================================
-import { layer } from './canvas.js';
-import { saveHistory } from './history.js';
+import { layer } from '../canvas/canvas.js';
+import { saveHistory } from '../history/history.js';
 
 let warpHandles = [];      // 現在表示中のハンドル群
 let warpTargetNode = null; // 変形対象のノード

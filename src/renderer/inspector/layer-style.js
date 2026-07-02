@@ -7,7 +7,7 @@
 // フィールドの値の読み書きは従来どおり inspector.js の onInspectorUpdate /
 // updateInspectorFromNode が id 経由で行うため、DOMの置き場所が変わっても動作は不変。
 // ============================================================
-import { selectedNodes } from './state.js';
+import { selectedNodes } from '../app/state.js';
 import { updateInspectorFromNode } from './inspector.js';
 
 let dialog, header, content, empty;

@@ -2,7 +2,7 @@
 // Konva キャンバス初期化
 // stage / layer / transformer / selectionRect を生成してエクスポートする
 // ============================================================
-import { currentCanvasWidth, currentCanvasHeight } from './state.js';
+import { currentCanvasWidth, currentCanvasHeight } from '../app/state.js';
 
 export const stage = new Konva.Stage({
     container: 'canvas-container',

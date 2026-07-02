@@ -2,8 +2,8 @@
 // settings-ui.js - プロジェクト設定パネルの連携
 // プロジェクト名・キャンバスサイズ・出力タイプを project.js に反映
 // ============================================================
-import { updateSettings, updateCanvasSetting, getSettings, getActivePage } from './project.js';
-import { updateCanvasSize } from './display.js';
+import { updateSettings, updateCanvasSetting, getSettings, getActivePage } from '../project/project.js';
+import { updateCanvasSize } from '../canvas/display.js';
 
 // エディタのキャンバス地色に、現在ページの実効背景色を反映
 function applyCanvasBgPreview() {

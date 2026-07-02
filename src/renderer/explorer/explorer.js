@@ -2,11 +2,11 @@
 // レイヤーエクスプローラー (D&D対応)
 // ボタン構成をページパネルと統一: 👁️(表示) 🔒(ロック) ✎(名前変更) ×(削除)
 // ============================================================
-import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode } from './state.js';
-import { applySelectedNodes } from './elements.js';
-import { updateInspectorFromNode, hideInspector } from './inspector.js';
-import { saveHistory } from './history.js';
+import { layer, tr } from '../canvas/canvas.js';
+import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode } from '../app/state.js';
+import { applySelectedNodes } from '../nodes/elements.js';
+import { updateInspectorFromNode, hideInspector } from '../inspector/inspector.js';
+import { saveHistory } from '../history/history.js';
 
 const LAYER_ICONS = { Group: '📁', Image: '🖼️', Label: 'T', Button: '🔘', Rect: '🟦', Circle: '⭕', Triangle: '🔺', Warp: '🔷', TextInput: '📝' };
 
