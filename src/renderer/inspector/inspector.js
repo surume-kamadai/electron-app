@@ -1,13 +1,13 @@
 // ============================================================
 // インスペクター (プロパティパネル)
 // ============================================================
-import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
-import { saveHistory } from './history.js';
-import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, applyGradText, applyGlow } from './elements.js';
-import { markMobileEdited, updatePcGeom } from './display.js';
-import { showToast } from './toast.js';
+import { layer, tr } from '../canvas/canvas.js';
+import { selectedNodes, setSelectedNodes, currentDevice } from '../app/state.js';
+import { saveHistory } from '../history/history.js';
+import { renderExplorer } from '../explorer/explorer.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, applyGradText, applyGlow } from '../nodes/elements.js';
+import { markMobileEdited, updatePcGeom } from '../canvas/display.js';
+import { showToast } from '../ui/toast.js';
 
 // 画像をダイアログから取得（api.js への循環参照を避けるためローカルに実装）
 async function pickImageDialog() {

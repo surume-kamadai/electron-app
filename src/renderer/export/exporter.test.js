@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildStaticProject, buildLaravelProject } from '../src/renderer/exporter.js';
+import { buildStaticProject, buildLaravelProject } from './exporter.js';
 
 const project = (overrides = {}) => ({
     settings: {

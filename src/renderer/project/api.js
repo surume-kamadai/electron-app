@@ -1,11 +1,11 @@
-// src/renderer/editor/api.js
-import { showToast } from './toast.js';
-import { saveHistory, clearPageHistory } from './history.js';
-import { updateCanvasSize } from './display.js';
-import { renderExplorer } from './explorer.js';
+// src/renderer/project/api.js
+import { showToast } from '../ui/toast.js';
+import { saveHistory, clearPageHistory } from '../history/history.js';
+import { updateCanvasSize } from '../canvas/display.js';
+import { renderExplorer } from '../explorer/explorer.js';
 import { serializeProject, loadProject, getProject, getSettings, saveCurrentPage } from './project.js';
-import { renderPages } from './pages-ui.js';
-import { buildStaticProject, buildLaravelProject } from '../exporter.js';
+import { renderPages } from '../explorer/pages-ui.js';
+import { buildStaticProject, buildLaravelProject } from '../export/exporter.js';
 
 // 保存先のパスを記憶する変数
 export let currentSavePath = null;

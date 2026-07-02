@@ -1,11 +1,11 @@
 // ============================================================
 // 要素の生成・グループ化・解除
 // ============================================================
-import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes } from './state.js';
-import { saveHistory } from './history.js';
-import { updateInspectorFromNode } from './inspector.js';
-import { renderExplorer } from './explorer.js';
+import { layer, tr } from '../canvas/canvas.js';
+import { selectedNodes, setSelectedNodes } from '../app/state.js';
+import { saveHistory } from '../history/history.js';
+import { updateInspectorFromNode } from '../inspector/inspector.js';
+import { renderExplorer } from '../explorer/explorer.js';
 
 const DEFAULT_PROPS = {
     Button:    { bgcolor: '#007acc', event: 'submit'   },

@@ -1,13 +1,13 @@
 // ============================================================
 // 履歴 (Undo) 管理 - ページごとに独立した履歴を持つ
 // ============================================================
-import { layer, tr } from './canvas.js';
-import { setSelectedNodes } from './state.js';
-import { generateSceneData } from './converter.js';
-import { hideInspector } from './inspector.js';
-import { renderExplorer } from './explorer.js';
-import { spawnElement } from './elements.js';
-import { getActivePageId } from './project.js';
+import { layer, tr } from '../canvas/canvas.js';
+import { setSelectedNodes } from '../app/state.js';
+import { generateSceneData } from '../nodes/converter.js';
+import { hideInspector } from '../inspector/inspector.js';
+import { renderExplorer } from '../explorer/explorer.js';
+import { spawnElement } from '../nodes/elements.js';
+import { getActivePageId } from '../project/project.js';
 
 const HISTORY_LIMIT = 50;
 

@@ -2,17 +2,17 @@
 // イベントハンドラ
 // ステージ操作 / キーボード / パネルドラッグ / 画像D&D / 右クリック
 // ============================================================
-import { stage, layer, tr, selectionRect } from './canvas.js';
-import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
-import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient, nextNumberForType, makeTypeCounter } from './elements.js';
-import { saveHistory, undo, redo } from './history.js';
-import { updateInspectorFromNode, deleteSelectedNode } from './inspector.js';
-import { renderExplorer } from './explorer.js';
-import { saveAndExport, importJSON, uploadImage } from './api.js';
-import { showToast } from './toast.js';
-import { processNode } from './converter.js';
-import { markMobileEdited, updatePcGeom } from './display.js';
-import { exitWarpMode, isWarpMode, getWarpTarget } from './warp.js';
+import { stage, layer, tr, selectionRect } from '../canvas/canvas.js';
+import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from '../app/state.js';
+import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient, nextNumberForType, makeTypeCounter } from '../nodes/elements.js';
+import { saveHistory, undo, redo } from '../history/history.js';
+import { updateInspectorFromNode, deleteSelectedNode } from '../inspector/inspector.js';
+import { renderExplorer } from '../explorer/explorer.js';
+import { saveAndExport, importJSON, uploadImage } from '../project/api.js';
+import { showToast } from '../ui/toast.js';
+import { processNode } from '../nodes/converter.js';
+import { markMobileEdited, updatePcGeom } from '../canvas/display.js';
+import { exitWarpMode, isWarpMode, getWarpTarget } from '../nodes/warp.js';
 
 // ============================================================
 // ステージ: トランスフォーム完了時のグループスケール正規化

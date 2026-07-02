@@ -2,9 +2,9 @@
 // JSONシリアライズ
 // Konvaノードをシーンデータ(JSON)に変換する
 // ============================================================
-import { currentCanvasWidth, currentCanvasHeight, currentDevice } from './state.js';
-import { layer } from './canvas.js';
-import { saveCurrentDeviceLayout } from './display.js';
+import { currentCanvasWidth, currentCanvasHeight, currentDevice } from '../app/state.js';
+import { layer } from '../canvas/canvas.js';
+import { saveCurrentDeviceLayout } from '../canvas/display.js';
 
 /**
  * Konvaノードを再帰的にシリアライズする。

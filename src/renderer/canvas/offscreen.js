@@ -9,10 +9,10 @@
 // requestAnimationFrame で常に最新の配置に追従する。
 // ============================================================
 import { stage, layer } from './canvas.js';
-import { currentCanvasWidth, currentCanvasHeight, selectedNodes } from './state.js';
-import { applySelectedNodes } from './elements.js';
-import { saveHistory } from './history.js';
-import { showToast } from './toast.js';
+import { currentCanvasWidth, currentCanvasHeight, selectedNodes } from '../app/state.js';
+import { applySelectedNodes } from '../nodes/elements.js';
+import { saveHistory } from '../history/history.js';
+import { showToast } from '../ui/toast.js';
 
 let overlay = null;
 let started = false;

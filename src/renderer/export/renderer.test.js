@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { HtmlRenderer } from '../src/renderer/renderer.js';
+import { HtmlRenderer } from './renderer.js';
 
 function render(scene, mode = 'static') {
     return new HtmlRenderer(scene, { mode, imageMap: new Map() }).render();

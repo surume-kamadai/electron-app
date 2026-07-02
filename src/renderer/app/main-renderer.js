@@ -1,37 +1,37 @@
 // ============================================================
 // main-renderer.js - エディタ画面のエントリーポイント（マルチページ版）
 // ============================================================
-import { spawnElement, groupNodes, ungroupNodes, createEmptyFolder,spawnComponent } from './editor/elements.js';
-import { onInspectorUpdate, deleteSelectedNode, alignNodes, distributeNodes } from './editor/inspector.js';
-import { saveAndExport, importJSON, startAutoSave } from './editor/api.js';
-import { renderExplorer } from './editor/explorer.js';
-import { saveHistory, clearPageHistory, undo, redo } from './editor/history.js';
-import { enterWarpMode, exitWarpMode } from './editor/warp.js';
-import { selectedNodes } from './editor/state.js';
-import { switchDevice } from './editor/display.js';
-import { playPreview, stopPreview } from './editor/preview.js';
+import { spawnElement, groupNodes, ungroupNodes, createEmptyFolder,spawnComponent } from '../nodes/elements.js';
+import { onInspectorUpdate, deleteSelectedNode, alignNodes, distributeNodes } from '../inspector/inspector.js';
+import { saveAndExport, importJSON, startAutoSave } from '../project/api.js';
+import { renderExplorer } from '../explorer/explorer.js';
+import { saveHistory, clearPageHistory, undo, redo } from '../history/history.js';
+import { enterWarpMode, exitWarpMode } from '../nodes/warp.js';
+import { selectedNodes } from './state.js';
+import { switchDevice } from '../canvas/display.js';
+import { playPreview, stopPreview } from '../preview/preview.js';
 
 
 // マルチページ・設定
-import { renderPages, onAddPage, onAddFolder } from './editor/pages-ui.js';
-import { newProject, initProject, getPages, getFolders } from './editor/project.js';
-import { initDockLayout, showPanel, hidePanel } from './editor/dock-layout.js';
-import { initCanvasPreview } from './editor/canvas-preview.js';
-import { initOffscreenIndicators } from './editor/offscreen.js';
-import { initRulers, toggleRulers } from './editor/rulers.js';
-import { initGradientOverlay } from './editor/gradient-overlay.js';
-import { initEffectOverlay } from './editor/effect-overlay.js';
-import { initColorPickers } from './editor/color-picker.js';
-import { initLayerStyleDialog } from './editor/layer-style.js';
+import { renderPages, onAddPage, onAddFolder } from '../explorer/pages-ui.js';
+import { newProject, initProject, getPages, getFolders } from '../project/project.js';
+import { initDockLayout, showPanel, hidePanel } from '../ui/dock-layout.js';
+import { initCanvasPreview } from '../canvas/canvas-preview.js';
+import { initOffscreenIndicators } from '../canvas/offscreen.js';
+import { initRulers, toggleRulers } from '../canvas/rulers.js';
+import { initGradientOverlay } from '../canvas/gradient-overlay.js';
+import { initEffectOverlay } from '../canvas/effect-overlay.js';
+import { initColorPickers } from '../inspector/color-picker.js';
+import { initLayerStyleDialog } from '../inspector/layer-style.js';
 import {
     onProjectNameChange, onOutputTypeChange,
     onCanvasSizeChange, initSettingsUI,
     updateSiteBgColor, updatePageBgColor, clearPageBgColor, syncBgColorUI,
     updateSiteSeo, updatePageSeo,
-} from './editor/settings-ui.js';
+} from '../ui/settings-ui.js';
 
 // events.js は副作用としてイベントリスナーを登録する
-import './editor/events.js';
+import '../interaction/events.js';
 
 // --- 要素操作 ---
 window.spawnElement       = spawnElement;

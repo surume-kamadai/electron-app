@@ -6,8 +6,8 @@ import {
     getPages, getActivePageId, switchPage, addPage,
     deletePage, renamePage, reorderPage,
     getFolders, addFolder, renameFolder, deleteFolder, setPageFolder,
-} from './project.js';
-import { showToast } from './toast.js';
+} from '../project/project.js';
+import { showToast } from '../ui/toast.js';
 
 let editingPageId   = null;
 let editingFolderId = null;

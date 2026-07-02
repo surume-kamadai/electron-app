@@ -10,7 +10,7 @@
 // - requestAnimationFrame で位置追従。内容は署名が変わった時だけ再生成。
 // ============================================================
 import { stage, layer } from './canvas.js';
-import { selectedNodes } from './state.js';
+import { selectedNodes } from '../app/state.js';
 
 const PREVIEW_TYPES = ['Slider', 'ArticleGrid', 'Accordion'];
 
