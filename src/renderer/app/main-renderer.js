@@ -1,7 +1,8 @@
 // ============================================================
 // main-renderer.js - エディタ画面のエントリーポイント（マルチページ版）
 // ============================================================
-import { spawnElement, groupNodes, ungroupNodes, createEmptyFolder,spawnComponent } from '../nodes/elements.js';
+import { spawnElement, groupNodes, ungroupNodes, createEmptyFolder } from '../nodes/elements.js';
+import { spawnComponent } from '../nodes/components.js';
 import { onInspectorUpdate, deleteSelectedNode, alignNodes, distributeNodes } from '../inspector/inspector.js';
 import { saveAndExport, importJSON, startAutoSave } from '../project/api.js';
 import { renderExplorer } from '../explorer/explorer.js';
@@ -32,6 +33,9 @@ import {
 
 // events.js は副作用としてイベントリスナーを登録する
 import '../interaction/events.js';
+// スライダー/アコーディオン編集モーダルは window.* 関数を副作用として登録する
+import '../inspector/slider-editor.js';
+import '../inspector/accordion-editor.js';
 
 // --- 要素操作 ---
 window.spawnElement       = spawnElement;
