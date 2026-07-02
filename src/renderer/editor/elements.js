@@ -2,7 +2,7 @@
 // 要素の生成・グループ化・解除
 // ============================================================
 import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, incrementElementCount } from './state.js';
+import { selectedNodes, setSelectedNodes } from './state.js';
 import { saveHistory } from './history.js';
 import { updateInspectorFromNode } from './inspector.js';
 import { renderExplorer } from './explorer.js';
@@ -29,18 +29,21 @@ export function applySelectedNodes(nodes) {
     // 【Group内子要素のdraggable制御】
     // 子要素は基本ロック (draggable:false)。選択された子だけ一時的に動かせるようにする。
     // これで「Cardをクリック→Cardが動く」「中のLabelをクリック→Labelだけ動く」が両立する。
+    // Space押下中(パンモード)は一切ドラッグ不可にする。
+    // これがないと、Space中にオブジェクトを選択した瞬間ここでdraggableが復活してしまう。
+    const spaceDown = typeof window !== 'undefined' && window.__spaceDown;
     layer.find('.ui-element').forEach(n => {
         const isInGroup = n.parent && n.parent.nodeType === 'Group' && n.parent.hasName('ui-element');
         if (!isInGroup) {
             // ルート直下の要素はロック設定（bData.lock）に従う
             const bData = n.getAttr('bladeData');
-            n.draggable(!(bData && bData.lock));
+            n.draggable(!(bData && bData.lock) && !spaceDown);
         } else {
             // Group内の子: 選択中の子はドラッグ可、それ以外はロック
             const selected = nodes.includes(n);
             const bData = n.getAttr('bladeData');
             const userLocked = !!(bData && bData.lock);
-            n.draggable(selected && !userLocked);
+            n.draggable(selected && !userLocked && !spaceDown);
         }
     });
 
@@ -89,11 +92,14 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         text:     type === 'Image' ? 'https://placehold.co/150x150/png' : 'テキスト',
         bgcolor:  DEFAULT_PROPS[type]?.bgcolor  ?? '#ffffff',
         color:    '#000000',
-        bgAlpha:  1,   // 背景色の不透明度
-        textAlpha:1,   // 文字色の不透明度
         fontsize: 16,
         align:    'left',
         fontfamily:'sans-serif',
+        fontWeight: type === 'Button' ? 'bold' : 'normal',  // normal | bold
+        italic:    false,
+        underline: false,
+        letterSpacing: 0,   // 字間(px)
+        lineHeight: 1.2,    // 行間(倍率)
         lock:     false,
         route:    '#',
         method:   'POST',
@@ -177,7 +183,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             const txt = new Konva.Text({
                 x: 0, y: 0,
                 width: base.width, height: base.height,
-                text: bData.text, fill: toRgba(bData.color, bData.textAlpha), fontSize: bData.fontsize,
+                text: bData.text, fill: bData.color, fontSize: bData.fontsize,
                 align: bData.align || 'center',
                 fontFamily: bData.fontfamily || 'sans-serif',
                 verticalAlign: 'middle',
@@ -188,7 +194,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             break;
         }
         case 'TextInput': newNode = new Konva.Rect({ ...base, fill: '#fff', stroke: '#ccc', strokeWidth: 1 }); break;
-        case 'Label':     newNode = new Konva.Text({ ...base, text: bData.text, fill: toRgba(bData.color, bData.textAlpha), fontSize: bData.fontsize, align: bData.align || 'left', fontFamily: bData.fontfamily || 'sans-serif' }); break;
+        case 'Label':     newNode = new Konva.Text({ ...base, text: bData.text, fill: bData.color, fontSize: bData.fontsize, align: bData.align || 'left', fontFamily: bData.fontfamily || 'sans-serif' }); break;
         case 'Rect':      newNode = new Konva.Rect({ ...base, fill: bData.bgcolor, cornerRadius: bData.cornerRadius || 0 }); break;
         case 'Warp': {
             const pts = bData.warpPoints || [
@@ -315,6 +321,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
     applyGradient(newNode, bData);
     applyStroke(newNode, bData);
     applyDropShadow(newNode, bData);
+    applyTextStyle(newNode, bData);   // 太さ/斜体/下線/字間/行間（Label/Button）
 
     newNode.on('dragend transformend', () => {
         updateInspectorFromNode();
@@ -477,17 +484,6 @@ export function applyNodeShadow(node, shadowType) {
     }
 }
 
-// #rrggbb + アルファ(0〜1) → 不透明なら hex のまま、半透明なら rgba() を返す。
-// 非hex(transparent 等)や未指定は元の値をそのまま返す。
-export function toRgba(hex, alpha) {
-    const a = (alpha == null) ? 1 : Math.min(1, Math.max(0, parseFloat(alpha)));
-    if (!/^#[0-9a-fA-F]{6}$/.test(String(hex))) return hex;
-    if (a >= 1) return hex;
-    const n = hex.slice(1);
-    const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${a})`;
-}
-
 // グラデーション（線形/放射状）をノードへ適用。off なら単色塗りに戻す。
 // 対象: Rect / Circle / Triangle / Button(内部bg)。Image はDOMオーバーレイ側で描画する。
 export function applyGradient(node, bData) {
@@ -505,7 +501,7 @@ export function applyGradient(node, bData) {
     const g = bData.gradient;
     if (!g || !g.on) {
         target.fillPriority('color');
-        const bg = toRgba(bData.bgcolor, bData.bgAlpha);
+        const bg = bData.bgcolor;
         target.fill(type === 'Button' ? (bData.bgimage ? null : bg) : bg);
         node.getLayer()?.batchDraw();
         return;
@@ -569,6 +565,56 @@ export function applyDropShadow(node, bData) {
     target.shadowOffsetY(parseFloat(d.y) || 0);
     target.shadowBlur(Math.max(0, parseFloat(d.blur) || 0));
     target.shadowOpacity(Math.min(1, Math.max(0, d.opacity ?? 0.35)));
+    node.getLayer()?.batchDraw();
+}
+
+// グラデーション文字（-webkit-background-clip:text 相当）をエディタで再現。
+// Konva.Text は fillLinearGradient に対応するので、文字自体をグラデ塗りにする。
+// 対象: Label（本体）/ Button（内部 .btn-text）。off なら単色(bData.color)へ戻す。
+export function applyGradText(node, bData) {
+    if (!node) return;
+    const type = node.getAttr('uiType');
+    let t = null;
+    if (type === 'Label') t = node;
+    else if (type === 'Button') t = node.findOne('.btn-text');
+    if (!t || typeof t.fillLinearGradientColorStops !== 'function') return;
+
+    const g = bData.gradText;
+    if (!g || !g.on) {
+        t.fillLinearGradientColorStops(null);
+        t.fillPriority('color');
+        t.fill(bData.color || '#000000');
+        node.getLayer()?.batchDraw();
+        return;
+    }
+    const w = t.width() || node.width() || 1;
+    const h = t.height() || node.height() || 1;
+    const DIRS = { v: [[0.5, 0], [0.5, 1]], h: [[0, 0.5], [1, 0.5]], d1: [[0, 0], [1, 1]], d2: [[1, 0], [0, 1]] };
+    const [s, e] = DIRS[g.dir] || DIRS.h;
+    t.fillLinearGradientStartPoint({ x: s[0] * w, y: s[1] * h });
+    t.fillLinearGradientEndPoint({ x: e[0] * w, y: e[1] * h });
+    t.fillLinearGradientColorStops([0, g.c1 || '#ff6ec4', 1, g.c2 || '#7873f5']);
+    t.fillPriority('linear-gradient');
+    node.getLayer()?.batchDraw();
+}
+
+// 光彩（外側グロー）をエディタで近似。Konvaのシャドウ枠は1つだけなので、
+// ドロップシャドウが有効なときはそちらを優先し、グローはキャンバスに出さない（出力CSSでは両方反映）。
+// off時は applyNodeShadow / applyDropShadow の結果に任せる（ここでは触らない）。
+export function applyGlow(node, bData) {
+    const g = bData && bData.glow;
+    if (!g || !g.on) return;
+    if (bData.dropShadow && bData.dropShadow.on) return;  // ドロップシャドウ優先
+    const uiType = node.getAttr('uiType');
+    let target = node;
+    if (uiType === 'Button') target = node.findOne('.btn-bg');
+    else if (uiType === 'Slider' || uiType === 'Accordion' || uiType === 'ArticleGrid') target = node.findOne('Rect');
+    if (uiType === 'Group' || !target || typeof target.shadowColor !== 'function') return;
+    target.shadowColor(g.color || '#00d0ff');
+    target.shadowOffsetX(0);
+    target.shadowOffsetY(0);
+    target.shadowBlur(Math.max(0, parseFloat(g.blur) || 0));
+    target.shadowOpacity(Math.min(1, Math.max(0, g.opacity ?? 0.8)));
     node.getLayer()?.batchDraw();
 }
 
@@ -721,18 +767,31 @@ export function applyImageCover(node) {
     }
 }
 
+// テキストノード(Konva.Text)へ 太さ/斜体/下線/字間/行間 を適用
+function applyTextExtras(t, bData) {
+    const parts = [];
+    if (bData.fontWeight === 'bold') parts.push('bold');
+    if (bData.italic) parts.push('italic');
+    t.fontStyle(parts.join(' ') || 'normal');
+    t.textDecoration(bData.underline ? 'underline' : '');
+    t.letterSpacing(parseFloat(bData.letterSpacing) || 0);
+    if (bData.lineHeight) t.lineHeight(parseFloat(bData.lineHeight) || 1);
+}
+
 export function applyTextStyle(node, bData) {
     if (!node) return;
     const type = node.getAttr('uiType');
-    
+
     if (type === 'Label') {
         node.align(bData.align || 'left');
         node.fontFamily(bData.fontfamily || 'sans-serif');
+        applyTextExtras(node, bData);
     } else if (type === 'Button') {
         const txt = node.findOne('.btn-text');
         if (txt) {
             txt.align(bData.align || 'center');
             txt.fontFamily(bData.fontfamily || 'sans-serif');
+            applyTextExtras(txt, bData);
         }
     }
 }

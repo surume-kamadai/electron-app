@@ -2,10 +2,10 @@
 // インスペクター (プロパティパネル)
 // ============================================================
 import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, currentDevice, setElementCount } from './state.js';
+import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
 import { saveHistory } from './history.js';
 import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, toRgba } from './elements.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, applyGradText, applyGlow } from './elements.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { showToast } from './toast.js';
 
@@ -24,8 +24,15 @@ async function pickImageDialog() {
 function setColorInput(id, val, def) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.value = (typeof val === 'string' && /^#[0-9a-fA-F]{6}$/.test(val)) ? val : def;
+    const v = (typeof val === 'string' && val) ? val : def;
+    // Pickr のスウォッチ(.color-field＋隠しinput)があればそちらへ、無ければ従来 type=color(hex)
+    if (window.__setColorField && document.querySelector(`.color-field[data-for="${id}"]`)) {
+        window.__setColorField(id, v);
+    } else {
+        el.value = /^#[0-9a-fA-F]{6}$/.test(v) ? v : def;
+    }
 }
+
 
 export function hideInspector() {
     document.getElementById('ins-fields').style.display = 'none';
@@ -65,12 +72,13 @@ export function updateInspectorFromNode() {
     // ※ この行は必ず const bData の宣言より後に置くこと（TDZエラー防止）
     const opacityInput = document.getElementById('ins-opacity');
     if (opacityInput) opacityInput.value = bData.opacity ?? 1;
-    const bgAlphaEl = document.getElementById('ins-bg-alpha');
-    if (bgAlphaEl) bgAlphaEl.value = (bData.bgAlpha == null ? 1 : bData.bgAlpha);
-    const textAlphaEl = document.getElementById('ins-text-alpha');
-    if (textAlphaEl) textAlphaEl.value = (bData.textAlpha == null ? 1 : bData.textAlpha);
     document.getElementById('ins-align').value      = bData.align || 'left';
     document.getElementById('ins-fontfamily').value = bData.fontfamily || 'sans-serif';
+    const _fw = document.getElementById('ins-fontweight'); if (_fw) _fw.value = bData.fontWeight || 'normal';
+    const _it = document.getElementById('ins-italic');      if (_it) _it.checked = !!bData.italic;
+    const _ul = document.getElementById('ins-underline');   if (_ul) _ul.checked = !!bData.underline;
+    const _ls = document.getElementById('ins-letterspacing'); if (_ls) _ls.value = bData.letterSpacing ?? 0;
+    const _lh = document.getElementById('ins-lineheight');    if (_lh) _lh.value = bData.lineHeight ?? 1.2;
     
     if (type === 'Label' || type === 'Button') {
         document.getElementById('group-text-align').style.display = 'block';
@@ -110,7 +118,7 @@ export function updateInspectorFromNode() {
             document.getElementById('ins-grid-columns').value = g.columns ?? 3;
             document.getElementById('ins-grid-gap').value     = g.gap ?? 20;
             document.getElementById('ins-grid-radius').value  = g.cardRadius ?? 8;
-            document.getElementById('ins-grid-arrow').value   = g.arrowColor ?? '#27ae60';
+            setColorInput('ins-grid-arrow', g.arrowColor, '#27ae60');
             document.getElementById('ins-grid-imgratio').value = g.imgRatio ?? '16/10';
             document.getElementById('ins-grid-padding').value  = g.cardPadding ?? 18;
             document.getElementById('ins-grid-slidermode').checked = g.sliderMode ?? false;
@@ -129,9 +137,9 @@ export function updateInspectorFromNode() {
         groupAcc.style.display = (type === 'Accordion') ? 'block' : 'none';
         if (type === 'Accordion') {
             const a = bData.accordion || {};
-            document.getElementById('ins-acc-headercolor').value = a.headerColor ?? '#2c3e50';
-            document.getElementById('ins-acc-headerbg').value    = a.headerBg ?? '#f7f9fa';
-            document.getElementById('ins-acc-bodycolor').value   = a.bodyColor ?? '#555555';
+            setColorInput('ins-acc-headercolor', a.headerColor, '#2c3e50');
+            setColorInput('ins-acc-headerbg',    a.headerBg,    '#f7f9fa');
+            setColorInput('ins-acc-bodycolor',   a.bodyColor,   '#555555');
             document.getElementById('ins-acc-openfirst').checked = a.openFirst ?? true;
         }
     }
@@ -244,7 +252,74 @@ export function updateInspectorFromNode() {
         }
     }
 
+    // ▼ グラデーション文字（テキスト系）
+    const gtGroup = document.getElementById('group-gradtext');
+    if (gtGroup) {
+        const supports = ['Label', 'Button'].includes(type);
+        gtGroup.style.display = supports ? 'block' : 'none';
+        if (supports) {
+            const g = bData.gradText || {};
+            document.getElementById('ins-gt-on').checked = !!g.on;
+            document.getElementById('ins-gt-dir').value  = g.dir || 'h';
+            setColorInput('ins-gt-c1', g.c1, '#ff6ec4');
+            setColorInput('ins-gt-c2', g.c2, '#7873f5');
+            document.getElementById('gradtext-fields').style.display = g.on ? 'block' : 'none';
+        }
+    }
+
+    // ▼ 内側シャドウ（図形/ボタン/画像）
+    const isGroup = document.getElementById('group-innershadow');
+    if (isGroup) {
+        const supports = ['Rect', 'Circle', 'Button', 'Image'].includes(type);
+        isGroup.style.display = supports ? 'block' : 'none';
+        if (supports) {
+            const s = bData.innerShadow || {};
+            document.getElementById('ins-is-on').checked    = !!s.on;
+            document.getElementById('ins-is-x').value       = parseFloat(s.x ?? 0);
+            document.getElementById('ins-is-y').value       = parseFloat(s.y ?? 3);
+            document.getElementById('ins-is-blur').value    = Math.max(0, parseFloat(s.blur ?? 6));
+            document.getElementById('ins-is-opacity').value = Math.min(1, Math.max(0, s.opacity ?? 0.4));
+            setColorInput('ins-is-color', s.color, '#000000');
+            document.getElementById('innershadow-fields').style.display = s.on ? 'block' : 'none';
+        }
+    }
+
+    // ▼ 光彩（グロー）（図形/ボタン/画像/テキスト）
+    const glowGroup = document.getElementById('group-glow');
+    if (glowGroup) {
+        const supports = ['Rect', 'Circle', 'Button', 'Image', 'Label'].includes(type);
+        glowGroup.style.display = supports ? 'block' : 'none';
+        if (supports) {
+            const g = bData.glow || {};
+            document.getElementById('ins-glow-on').checked    = !!g.on;
+            document.getElementById('ins-glow-blur').value    = Math.max(0, parseFloat(g.blur ?? 12));
+            document.getElementById('ins-glow-spread').value  = parseFloat(g.spread ?? 0);
+            document.getElementById('ins-glow-opacity').value = Math.min(1, Math.max(0, g.opacity ?? 0.8));
+            setColorInput('ins-glow-color', g.color, '#00d0ff');
+            document.getElementById('glow-fields').style.display = g.on ? 'block' : 'none';
+        }
+    }
+
+    // ▼ ベベル＆エンボス（図形/ボタン/画像）
+    const bevelGroup = document.getElementById('group-bevel');
+    if (bevelGroup) {
+        const supports = ['Rect', 'Circle', 'Button', 'Image'].includes(type);
+        bevelGroup.style.display = supports ? 'block' : 'none';
+        if (supports) {
+            const b = bData.bevel || {};
+            document.getElementById('ins-bevel-on').checked    = !!b.on;
+            document.getElementById('ins-bevel-depth').value   = Math.max(1, parseFloat(b.depth ?? 4));
+            document.getElementById('ins-bevel-dir').value     = b.dir || 'up';
+            setColorInput('ins-bevel-hl', b.highlight, '#ffffff');
+            setColorInput('ins-bevel-sh', b.shadow, '#000000');
+            document.getElementById('ins-bevel-opacity').value = Math.min(1, Math.max(0, b.opacity ?? 0.5));
+            document.getElementById('bevel-fields').style.display = b.on ? 'block' : 'none';
+        }
+    }
+
     renderEventList(node);
+    // レイヤースタイル・ダイアログが開いていれば本体/案内の表示を同期
+    window.__syncLayerStyleDialog?.();
 }
 
 export function onInspectorUpdate(shouldSaveHistory = true) {
@@ -254,10 +329,8 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
 
     bData.name     = document.getElementById('ins-name').value;
     bData.text     = document.getElementById('ins-text').value;
-    bData.bgcolor  = document.getElementById('ins-bgcolor').value;
+    bData.bgcolor  = document.getElementById('ins-bgcolor').value;   // #rrggbb または rgba(...)
     bData.color    = document.getElementById('ins-color').value;
-    bData.bgAlpha  = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-bg-alpha')?.value ?? 1)));
-    bData.textAlpha = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-text-alpha')?.value ?? 1)));
 
     // 不透明度: parseFloat が NaN を返しても ?? は NaN を素通りさせてしまうため、
     // Number.isFinite で判定し、0〜1にクランプする（不正値で要素が消えるのを防ぐ）。
@@ -284,6 +357,11 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
     }
     bData.align      = document.getElementById('ins-align').value;
     bData.fontfamily = document.getElementById('ins-fontfamily').value;
+    bData.fontWeight = document.getElementById('ins-fontweight')?.value || 'normal';
+    bData.italic     = !!document.getElementById('ins-italic')?.checked;
+    bData.underline  = !!document.getElementById('ins-underline')?.checked;
+    bData.letterSpacing = parseFloat(document.getElementById('ins-letterspacing')?.value) || 0;
+    bData.lineHeight = parseFloat(document.getElementById('ins-lineheight')?.value) || 1.2;
     
     bData.route    = document.getElementById('ins-route').value;
     bData.method   = document.getElementById('ins-method').value;
@@ -379,7 +457,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
 
     if (type === 'Label') {
         node.text(bData.text);
-        node.fill(toRgba(bData.color, bData.textAlpha));
+        node.fill(bData.color);
         node.fontSize(displayFontsize);
     } else if (type === 'Button') {
         const bg = node.findOne('.btn-bg');
@@ -399,7 +477,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
             txt.width(node.width());
             txt.height(node.height());
             txt.text(bData.text);
-            txt.fill(toRgba(bData.color, bData.textAlpha));
+            txt.fill(bData.color);
             txt.fontSize(displayFontsize);
         }
     } else if (type === 'Rect') {
@@ -443,6 +521,50 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
         // チェックON/種類変更に応じて詳細欄の表示を即時に切り替える（再選択を待たない）
         document.getElementById('grad-fields').style.display   = bData.gradient.on ? 'block' : 'none';
         document.getElementById('grad-dir-wrap').style.display = (bData.gradient.type === 'radial') ? 'none' : 'block';
+    }
+
+    // グラデーション文字（テキスト系）の保存と適用（単色fillの後に上書き）
+    if (['Label', 'Button'].includes(type)) {
+        if (!bData.gradText) bData.gradText = {};
+        bData.gradText.on  = document.getElementById('ins-gt-on').checked;
+        bData.gradText.dir = document.getElementById('ins-gt-dir').value;
+        bData.gradText.c1  = document.getElementById('ins-gt-c1').value;
+        bData.gradText.c2  = document.getElementById('ins-gt-c2').value;
+        applyGradText(node, bData);
+        document.getElementById('gradtext-fields').style.display = bData.gradText.on ? 'block' : 'none';
+    }
+
+    // 内側シャドウ / ベベル（Konva非対応のため出力CSSで反映。エディタ表示は近似なし）
+    if (['Rect', 'Circle', 'Button', 'Image'].includes(type)) {
+        if (!bData.innerShadow) bData.innerShadow = {};
+        bData.innerShadow.on      = document.getElementById('ins-is-on').checked;
+        bData.innerShadow.x       = parseFloat(document.getElementById('ins-is-x').value) || 0;
+        bData.innerShadow.y       = parseFloat(document.getElementById('ins-is-y').value) || 0;
+        bData.innerShadow.blur    = Math.max(0, parseFloat(document.getElementById('ins-is-blur').value) || 0);
+        bData.innerShadow.color   = document.getElementById('ins-is-color').value;
+        bData.innerShadow.opacity = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-is-opacity').value) || 0));
+        document.getElementById('innershadow-fields').style.display = bData.innerShadow.on ? 'block' : 'none';
+
+        if (!bData.bevel) bData.bevel = {};
+        bData.bevel.on        = document.getElementById('ins-bevel-on').checked;
+        bData.bevel.depth     = Math.max(1, parseFloat(document.getElementById('ins-bevel-depth').value) || 1);
+        bData.bevel.dir       = document.getElementById('ins-bevel-dir').value;
+        bData.bevel.highlight = document.getElementById('ins-bevel-hl').value;
+        bData.bevel.shadow    = document.getElementById('ins-bevel-sh').value;
+        bData.bevel.opacity   = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-bevel-opacity').value) || 0));
+        document.getElementById('bevel-fields').style.display = bData.bevel.on ? 'block' : 'none';
+    }
+
+    // 光彩（グロー）の保存と適用（テキスト含む。ドロップシャドウが優先）
+    if (['Rect', 'Circle', 'Button', 'Image', 'Label'].includes(type)) {
+        if (!bData.glow) bData.glow = {};
+        bData.glow.on      = document.getElementById('ins-glow-on').checked;
+        bData.glow.blur    = Math.max(0, parseFloat(document.getElementById('ins-glow-blur').value) || 0);
+        bData.glow.spread  = parseFloat(document.getElementById('ins-glow-spread').value) || 0;
+        bData.glow.color   = document.getElementById('ins-glow-color').value;
+        bData.glow.opacity = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-glow-opacity').value) || 0));
+        applyGlow(node, bData);
+        document.getElementById('glow-fields').style.display = bData.glow.on ? 'block' : 'none';
     }
 
     node.setAttr('bladeData', bData);
@@ -894,8 +1016,6 @@ export function deleteSelectedNode() {
     setSelectedNodes([]);
     tr.nodes([]);
     hideInspector();
-    // 全要素が消えたら連番をリセット（次に作る要素が1から始まる）
-    if (layer.find('.ui-element').length === 0) setElementCount(0);
     renderExplorer();
     layer.batchDraw();
     saveHistory();

@@ -39,8 +39,9 @@ export function clearPageBgColor() {
     if (!page) return;
     page.bgColor = '';
     const s = getSettings();
-    const picker = document.getElementById('page-bg-color');
-    if (picker) picker.value = s.siteBgColor || '#f1f2f6';
+    const pv = s.siteBgColor || '#f1f2f6';
+    if (window.__setColorField) window.__setColorField('page-bg-color', pv);
+    else { const picker = document.getElementById('page-bg-color'); if (picker) picker.value = pv; }
     applyCanvasBgPreview();
     refreshPageBgStatus();
 }
@@ -63,10 +64,13 @@ function refreshPageBgStatus() {
 export function syncBgColorUI() {
     const s = getSettings();
     const page = getActivePage();
-    const siteEl = document.getElementById('site-bg-color');
-    const pageEl = document.getElementById('page-bg-color');
-    if (siteEl) siteEl.value = s.siteBgColor || '#f1f2f6';
-    if (pageEl) pageEl.value = (page && page.bgColor) ? page.bgColor : (s.siteBgColor || '#f1f2f6');
+    const siteVal = s.siteBgColor || '#f1f2f6';
+    const pageVal = (page && page.bgColor) ? page.bgColor : (s.siteBgColor || '#f1f2f6');
+    if (window.__setColorField) { window.__setColorField('site-bg-color', siteVal); window.__setColorField('page-bg-color', pageVal); }
+    else {
+        const siteEl = document.getElementById('site-bg-color'); if (siteEl) siteEl.value = siteVal;
+        const pageEl = document.getElementById('page-bg-color'); if (pageEl) pageEl.value = pageVal;
+    }
     applyCanvasBgPreview();
     refreshPageBgStatus();
     syncSeoUI();

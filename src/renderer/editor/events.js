@@ -3,7 +3,7 @@
 // ステージ操作 / キーボード / パネルドラッグ / 画像D&D / 右クリック
 // ============================================================
 import { stage, layer, tr, selectionRect } from './canvas.js';
-import { selectedNodes, setSelectedNodes, incrementElementCount, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
+import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from './state.js';
 import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient, nextNumberForType, makeTypeCounter } from './elements.js';
 import { saveHistory, undo, redo } from './history.js';
 import { updateInspectorFromNode, deleteSelectedNode } from './inspector.js';
@@ -675,230 +675,8 @@ document.getElementById('workspace').addEventListener('drop', async e => {
     img.src = imageUrl;
 });
 
-// ============================================================
-// パネルドラッグ
-// ============================================================
-// 旧フローティングパネルのドラッグ処理は golden-layout 導入により無効化。
-// （パネルは #panel-source 内で空になり、中身はペインへ移植済み）
-document.querySelectorAll('.floating-panel.__disabled_old_panels').forEach(panel => {
-    const header = panel.querySelector('.panel-header');
-    if (!header) return;
-
-    // ヘッダーに折りたたみボタンを動的に追加（テキストはspanで包む）
-    if (!header.querySelector('.panel-collapse-btn')) {
-        const titleText = header.textContent.trim();
-        header.textContent = '';
-        const titleSpan = document.createElement('span');
-        titleSpan.textContent = titleText;
-        titleSpan.style.flex = '1';
-        const collapseBtn = document.createElement('button');
-        collapseBtn.className = 'panel-collapse-btn';
-        collapseBtn.innerText = '−';
-        collapseBtn.title = '折りたたみ / 展開';
-        header.appendChild(titleSpan);
-        header.appendChild(collapseBtn);
-
-        // 折りたたみ時に元のサイズを覚えておく
-        let savedSize = null;
-        collapseBtn.onmousedown = e => e.stopPropagation(); // ヘッダードラッグと分離
-        collapseBtn.onclick = e => {
-            e.stopPropagation();
-            const isCollapsed = panel.classList.toggle('collapsed');
-            if (isCollapsed) {
-                savedSize = { w: panel.style.width, h: panel.style.height };
-                collapseBtn.innerText = '＋';
-            } else {
-                if (savedSize) {
-                    if (savedSize.w) panel.style.width = savedSize.w;
-                    if (savedSize.h) panel.style.height = savedSize.h;
-                }
-                collapseBtn.innerText = '−';
-            }
-        };
-    }
-
-    let pos3 = 0, pos4 = 0;
-
-    header.onmousedown = e => {
-        if (e.target.classList.contains('panel-collapse-btn')) return;
-        e.preventDefault();
-        document.querySelectorAll('.floating-panel').forEach(p => p.style.zIndex = 100);
-        panel.style.zIndex = 101;
-        pos3 = e.clientX; pos4 = e.clientY;
-
-        document.onmouseup = () => {
-            document.onmouseup   = null;
-            document.onmousemove = null;
-            clearSnapGuides();
-            clearDockHighlight();
-            applyFinalSnap(panel);
-        };
-        document.onmousemove = ev => {
-            ev.preventDefault();
-            const dx = pos3 - ev.clientX, dy = pos4 - ev.clientY;
-            pos3 = ev.clientX; pos4 = ev.clientY;
-            panel.style.top  = (panel.offsetTop  - dy) + 'px';
-            panel.style.left = (panel.offsetLeft - dx) + 'px';
-            // ドラッグ中: スナップ候補とドックゾーンを可視化
-            showSnapGuides(panel);
-            showDockHighlight(panel, ev.clientX);
-        };
-    };
-
-    panel.addEventListener('mousedown', () => {
-        document.querySelectorAll('.floating-panel').forEach(p => p.style.zIndex = 100);
-        panel.style.zIndex = 101;
-    });
-});
-
-// ============================================================
-// パネルのスナップ・ドッキング補助関数
-// ============================================================
-const SNAP_T = 12;       // 吸着距離
-const SCREEN_MARGIN = 20; // 画面端余白
-const DOCK_TRIGGER = 40;  // 画面端からこの距離でドックゾーン発動
-
-function getOtherPanels(self) {
-    return Array.from(document.querySelectorAll('.floating-panel')).filter(p => p !== self);
-}
-
-function clearSnapGuides() {
-    document.querySelectorAll('.snap-guide').forEach(g => g.remove());
-}
-function clearDockHighlight() {
-    document.querySelectorAll('.dock-zone-highlight').forEach(d => d.remove());
-}
-
-// 吸着候補となるX/Y座標を集める
-function collectSnapTargets(self) {
-    const W = window.innerWidth, H = window.innerHeight;
-    const xs = [SCREEN_MARGIN, W - SCREEN_MARGIN]; // 画面左端・右端
-    const ys = [SCREEN_MARGIN, H - SCREEN_MARGIN]; // 画面上端・下端
-    getOtherPanels(self).forEach(p => {
-        const r = p.getBoundingClientRect();
-        xs.push(r.left, r.right);
-        ys.push(r.top, r.bottom);
-    });
-    return { xs, ys };
-}
-
-// ドラッグ中にスナップしそうな線を表示
-function showSnapGuides(panel) {
-    clearSnapGuides();
-    const r = panel.getBoundingClientRect();
-    const { xs, ys } = collectSnapTargets(panel);
-    const H = window.innerHeight, W = window.innerWidth;
-
-    // 左端・右端の吸着
-    [['left', r.left], ['right', r.right]].forEach(([edge, val]) => {
-        for (const tx of xs) {
-            if (Math.abs(val - tx) <= SNAP_T) {
-                const g = document.createElement('div');
-                g.className = 'snap-guide vertical';
-                g.style.left = tx + 'px'; g.style.top = '0'; g.style.height = H + 'px';
-                document.body.appendChild(g);
-                break;
-            }
-        }
-    });
-    // 上端・下端の吸着
-    [['top', r.top], ['bottom', r.bottom]].forEach(([edge, val]) => {
-        for (const ty of ys) {
-            if (Math.abs(val - ty) <= SNAP_T) {
-                const g = document.createElement('div');
-                g.className = 'snap-guide horizontal';
-                g.style.top = ty + 'px'; g.style.left = '0'; g.style.width = W + 'px';
-                document.body.appendChild(g);
-                break;
-            }
-        }
-    });
-}
-
-// ドックゾーン(画面左右端)のハイライト
-function showDockHighlight(panel, mouseX) {
-    clearDockHighlight();
-    const W = window.innerWidth;
-    let side = null;
-    if (mouseX <= DOCK_TRIGGER) side = 'left';
-    else if (mouseX >= W - DOCK_TRIGGER) side = 'right';
-    if (!side) return;
-
-    const d = document.createElement('div');
-    d.className = 'dock-zone-highlight';
-    const panelW = panel.getBoundingClientRect().width;
-    if (side === 'left') d.style.left = '0';
-    else d.style.right = '0';
-    d.style.width = Math.max(280, panelW) + 'px';
-    document.body.appendChild(d);
-    panel.dataset.dockSide = side;
-}
-
-// マウスを離した時に最終的な吸着・ドックを適用
-function applyFinalSnap(panel) {
-    const W = window.innerWidth, H = window.innerHeight;
-    const r = panel.getBoundingClientRect();
-
-    // ドックゾーンに入っていれば、その端の列に収納
-    const dockSide = panel.dataset.dockSide;
-    if (dockSide) {
-        delete panel.dataset.dockSide;
-        dockPanelToSide(panel, dockSide);
-        return;
-    }
-
-    // 通常スナップ: 各辺を最も近い候補に吸着
-    const { xs, ys } = collectSnapTargets(panel);
-    let newLeft = r.left, newTop = r.top;
-
-    // 左辺・右辺
-    let bestDx = SNAP_T + 1, snapLeft = null;
-    for (const tx of xs) {
-        if (Math.abs(r.left - tx) < bestDx)  { bestDx = Math.abs(r.left - tx);  snapLeft = tx; }
-        if (Math.abs(r.right - tx) < bestDx) { bestDx = Math.abs(r.right - tx); snapLeft = tx - r.width; }
-    }
-    if (snapLeft !== null) newLeft = snapLeft;
-
-    // 上辺・下辺
-    let bestDy = SNAP_T + 1, snapTop = null;
-    for (const ty of ys) {
-        if (Math.abs(r.top - ty) < bestDy)    { bestDy = Math.abs(r.top - ty);    snapTop = ty; }
-        if (Math.abs(r.bottom - ty) < bestDy) { bestDy = Math.abs(r.bottom - ty); snapTop = ty - r.height; }
-    }
-    if (snapTop !== null) newTop = snapTop;
-
-    panel.style.left = newLeft + 'px';
-    panel.style.top  = newTop + 'px';
-    panel.style.right = 'auto';
-}
-
-// パネルを画面端の列にドッキング（既存ドックパネルの下に積む）
-function dockPanelToSide(panel, side) {
-    const W = window.innerWidth;
-    const panelW = Math.max(280, panel.getBoundingClientRect().width);
-
-    // 同じ側に既にドックされているパネルを探して、その下に積む
-    const docked = Array.from(document.querySelectorAll(`.floating-panel[data-docked="${side}"]`))
-        .filter(p => p !== panel)
-        .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-
-    let topPos = SCREEN_MARGIN;
-    if (docked.length > 0) {
-        const last = docked[docked.length - 1].getBoundingClientRect();
-        topPos = last.bottom + 8;
-    }
-
-    panel.style.width = panelW + 'px';
-    panel.style.top   = topPos + 'px';
-    if (side === 'left') {
-        panel.style.left = SCREEN_MARGIN + 'px';
-        panel.style.right = 'auto';
-    } else {
-        panel.style.left = (W - panelW - SCREEN_MARGIN) + 'px';
-        panel.style.right = 'auto';
-    }
-    panel.dataset.docked = side;
-}
+// （旧フローティングパネルのドラッグ/スナップ/ドッキング処理は
+//   golden-layout 導入で不要になったため削除）
 
 // ============================================================
 // 右クリック（コンテキストメニュー）の制御
@@ -950,6 +728,10 @@ if (contextMenu) {
     document.getElementById('menu-delete').onclick  = deleteSelectedNode;
     document.getElementById('menu-group').onclick   = groupNodes;
     document.getElementById('menu-ungroup').onclick = ungroupNodes;
+
+    // 🎨 レイヤースタイル: フローティングダイアログを開く
+    const menuLayerStyle = document.getElementById('menu-layerstyle');
+    if (menuLayerStyle) menuLayerStyle.onclick = () => window.openLayerStyleDialog?.();
 }
 
 // ============================================================
