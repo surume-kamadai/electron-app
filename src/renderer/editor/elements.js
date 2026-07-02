@@ -568,6 +568,56 @@ export function applyDropShadow(node, bData) {
     node.getLayer()?.batchDraw();
 }
 
+// グラデーション文字（-webkit-background-clip:text 相当）をエディタで再現。
+// Konva.Text は fillLinearGradient に対応するので、文字自体をグラデ塗りにする。
+// 対象: Label（本体）/ Button（内部 .btn-text）。off なら単色(bData.color)へ戻す。
+export function applyGradText(node, bData) {
+    if (!node) return;
+    const type = node.getAttr('uiType');
+    let t = null;
+    if (type === 'Label') t = node;
+    else if (type === 'Button') t = node.findOne('.btn-text');
+    if (!t || typeof t.fillLinearGradientColorStops !== 'function') return;
+
+    const g = bData.gradText;
+    if (!g || !g.on) {
+        t.fillLinearGradientColorStops(null);
+        t.fillPriority('color');
+        t.fill(bData.color || '#000000');
+        node.getLayer()?.batchDraw();
+        return;
+    }
+    const w = t.width() || node.width() || 1;
+    const h = t.height() || node.height() || 1;
+    const DIRS = { v: [[0.5, 0], [0.5, 1]], h: [[0, 0.5], [1, 0.5]], d1: [[0, 0], [1, 1]], d2: [[1, 0], [0, 1]] };
+    const [s, e] = DIRS[g.dir] || DIRS.h;
+    t.fillLinearGradientStartPoint({ x: s[0] * w, y: s[1] * h });
+    t.fillLinearGradientEndPoint({ x: e[0] * w, y: e[1] * h });
+    t.fillLinearGradientColorStops([0, g.c1 || '#ff6ec4', 1, g.c2 || '#7873f5']);
+    t.fillPriority('linear-gradient');
+    node.getLayer()?.batchDraw();
+}
+
+// 光彩（外側グロー）をエディタで近似。Konvaのシャドウ枠は1つだけなので、
+// ドロップシャドウが有効なときはそちらを優先し、グローはキャンバスに出さない（出力CSSでは両方反映）。
+// off時は applyNodeShadow / applyDropShadow の結果に任せる（ここでは触らない）。
+export function applyGlow(node, bData) {
+    const g = bData && bData.glow;
+    if (!g || !g.on) return;
+    if (bData.dropShadow && bData.dropShadow.on) return;  // ドロップシャドウ優先
+    const uiType = node.getAttr('uiType');
+    let target = node;
+    if (uiType === 'Button') target = node.findOne('.btn-bg');
+    else if (uiType === 'Slider' || uiType === 'Accordion' || uiType === 'ArticleGrid') target = node.findOne('Rect');
+    if (uiType === 'Group' || !target || typeof target.shadowColor !== 'function') return;
+    target.shadowColor(g.color || '#00d0ff');
+    target.shadowOffsetX(0);
+    target.shadowOffsetY(0);
+    target.shadowBlur(Math.max(0, parseFloat(g.blur) || 0));
+    target.shadowOpacity(Math.min(1, Math.max(0, g.opacity ?? 0.8)));
+    node.getLayer()?.batchDraw();
+}
+
 // 角の丸みをノードへ適用（Rect / Image / Button内部bg・bg画像）
 export function applyCornerRadius(node, bData) {
     if (!node) return;

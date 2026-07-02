@@ -728,6 +728,10 @@ if (contextMenu) {
     document.getElementById('menu-delete').onclick  = deleteSelectedNode;
     document.getElementById('menu-group').onclick   = groupNodes;
     document.getElementById('menu-ungroup').onclick = ungroupNodes;
+
+    // 🎨 レイヤースタイル: フローティングダイアログを開く
+    const menuLayerStyle = document.getElementById('menu-layerstyle');
+    if (menuLayerStyle) menuLayerStyle.onclick = () => window.openLayerStyleDialog?.();
 }
 
 // ============================================================

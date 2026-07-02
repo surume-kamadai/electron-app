@@ -757,5 +757,142 @@
         </div>
     </div>
     <!-- ▲ アコーディオン項目編集モーダル ▲ -->
+
+    <!-- ▼ 右クリック コンテキストメニュー ▼ -->
+    <style>
+        #context-menu { position:fixed; z-index:99999; display:none; background:#252526; border:1px solid #555;
+            border-radius:6px; padding:4px; min-width:184px; box-shadow:0 6px 20px rgba(0,0,0,0.5); font-size:13px; }
+        #context-menu .ctx-item { padding:6px 12px; color:#ddd; cursor:pointer; border-radius:4px; white-space:nowrap; }
+        #context-menu .ctx-item:hover { background:#0a84ff; color:#fff; }
+        #context-menu .ctx-sep { height:1px; background:#444; margin:4px 6px; }
+        /* レイヤースタイル・フローティングダイアログ */
+        #layer-style-dialog { position:fixed; z-index:99997; width:300px; max-height:80vh; background:#252526; border:1px solid #555;
+            border-radius:8px; box-shadow:0 10px 40px rgba(0,0,0,0.55); display:none; flex-direction:column; font-size:12px; color:#ddd; }
+        #layer-style-dialog .ls-header { padding:9px 12px; background:#1e1e1e; border-bottom:1px solid #444; border-radius:8px 8px 0 0;
+            display:flex; justify-content:space-between; align-items:center; cursor:move; user-select:none; }
+        #layer-style-dialog .ls-body { padding:10px 12px; overflow-y:auto; flex:1; }
+        #layer-style-dialog .ls-section { border-top:1px solid #3a3a3a; padding-top:8px; margin-top:8px; }
+        #layer-style-dialog .ls-section:first-child { border-top:none; padding-top:0; margin-top:0; }
+        #layer-style-dialog .ls-hint { font-size:10px; color:#888; margin-top:4px; }
+        #layer-style-dialog .ls-empty { color:#888; font-size:12px; padding:16px 4px; text-align:center; }
+    </style>
+    <div id="context-menu">
+        <div id="menu-layerstyle" class="ctx-item">🎨 レイヤースタイル…</div>
+        <div class="ctx-sep"></div>
+        <div id="menu-bring-front" class="ctx-item">⬆️ 最前面へ</div>
+        <div id="menu-send-back" class="ctx-item">⬇️ 最背面へ</div>
+        <div class="ctx-sep"></div>
+        <div id="menu-copy" class="ctx-item">📋 コピー</div>
+        <div id="menu-paste" class="ctx-item">📄 貼り付け</div>
+        <div id="menu-delete" class="ctx-item">🗑️ 削除</div>
+        <div class="ctx-sep"></div>
+        <div id="menu-group" class="ctx-item">🔗 グループ化</div>
+        <div id="menu-ungroup" class="ctx-item">✂️ グループ解除</div>
+    </div>
+    <!-- ▲ 右クリック コンテキストメニュー ▲ -->
+
+    <!-- ▼ レイヤースタイル・フローティングダイアログ ▼ -->
+    <div id="layer-style-dialog">
+        <div class="ls-header" id="ls-header">
+            <span style="font-weight:bold; color:#fff;">🎨 レイヤースタイル</span>
+            <button type="button" id="ls-close" style="width:auto; margin:0; padding:2px 9px; background:#444; font-size:12px;">✕</button>
+        </div>
+        <div class="ls-body">
+            <div id="ls-empty" class="ls-empty">要素を選択すると<br>レイヤースタイルを編集できます。</div>
+            <div id="ls-content" style="display:none;">
+                <!-- 既存の3グループ(ドロップシャドウ/境界線/グラデーション)がここへ移設される -->
+                <div id="ls-relocate-slot"></div>
+
+                <!-- 🌈 グラデーション文字 -->
+                <div id="group-gradtext" class="ls-section" style="display:none;">
+                    <label><input type="checkbox" id="ins-gt-on" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 🌈 グラデーション文字</label>
+                    <div id="gradtext-fields" style="display:none; margin-top:5px;">
+                        <div class="row">
+                            <div class="form-group">
+                                <label>方向</label>
+                                <select id="ins-gt-dir" onchange="onInspectorUpdate(true)">
+                                    <option value="h">左 → 右</option>
+                                    <option value="v">上 → 下</option>
+                                    <option value="d1">左上 → 右下</option>
+                                    <option value="d2">右上 → 左下</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>色1（開始）</label>
+                                <input type="hidden" id="ins-gt-c1" value="#ff6ec4" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-gt-c1"></button>
+                            </div>
+                            <div class="form-group">
+                                <label>色2（終了）</label>
+                                <input type="hidden" id="ins-gt-c2" value="#7873f5" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-gt-c2"></button>
+                            </div>
+                        </div>
+                        <div class="ls-hint">文字自体にグラデーションを塗ります（テキスト／ボタン文字）。</div>
+                    </div>
+                </div>
+
+                <!-- 🌘 内側シャドウ -->
+                <div id="group-innershadow" class="ls-section" style="display:none;">
+                    <label><input type="checkbox" id="ins-is-on" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 🌘 内側シャドウ</label>
+                    <div id="innershadow-fields" style="display:none; margin-top:5px;">
+                        <div class="row">
+                            <div class="form-group"><label>X（横px）</label><input type="number" id="ins-is-x" value="0" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                            <div class="form-group"><label>Y（縦px）</label><input type="number" id="ins-is-y" value="3" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>ぼかし（px）</label><input type="number" id="ins-is-blur" value="6" min="0" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                            <div class="form-group"><label>不透明度</label><input type="range" id="ins-is-opacity" min="0" max="1" step="0.05" value="0.4" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>影の色</label><input type="hidden" id="ins-is-color" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-is-color"></button></div>
+                        </div>
+                        <div class="ls-hint">要素の内側にくぼんだ影（box-shadow inset）。図形／ボタン／画像で有効。</div>
+                    </div>
+                </div>
+
+                <!-- ✨ 光彩（グロー） -->
+                <div id="group-glow" class="ls-section" style="display:none;">
+                    <label><input type="checkbox" id="ins-glow-on" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> ✨ 光彩（グロー）</label>
+                    <div id="glow-fields" style="display:none; margin-top:5px;">
+                        <div class="row">
+                            <div class="form-group"><label>ぼかし（px）</label><input type="number" id="ins-glow-blur" value="12" min="0" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                            <div class="form-group"><label>広がり（px）</label><input type="number" id="ins-glow-spread" value="0" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>光の色</label><input type="hidden" id="ins-glow-color" value="#00d0ff" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-glow-color"></button></div>
+                            <div class="form-group"><label>不透明度</label><input type="range" id="ins-glow-opacity" min="0" max="1" step="0.05" value="0.8" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                        </div>
+                        <div class="ls-hint">外側に発光する光彩。テキストは広がり非対応（ぼかしのみ）。</div>
+                    </div>
+                </div>
+
+                <!-- 🔲 ベベル＆エンボス -->
+                <div id="group-bevel" class="ls-section" style="display:none;">
+                    <label><input type="checkbox" id="ins-bevel-on" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:4px;"> 🔲 ベベル＆エンボス</label>
+                    <div id="bevel-fields" style="display:none; margin-top:5px;">
+                        <div class="row">
+                            <div class="form-group"><label>深さ（px）</label><input type="number" id="ins-bevel-depth" value="4" min="1" max="30" step="1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                            <div class="form-group"><label>向き</label>
+                                <select id="ins-bevel-dir" onchange="onInspectorUpdate(true)">
+                                    <option value="up">浮き出し（凸）</option>
+                                    <option value="down">くぼみ（凹）</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>ハイライト色</label><input type="hidden" id="ins-bevel-hl" value="#ffffff" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-bevel-hl"></button></div>
+                            <div class="form-group"><label>影色</label><input type="hidden" id="ins-bevel-sh" value="#000000" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"><button type="button" class="color-field" data-noalpha data-for="ins-bevel-sh"></button></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>強さ</label><input type="range" id="ins-bevel-opacity" min="0" max="1" step="0.05" value="0.5" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)"></div>
+                        </div>
+                        <div class="ls-hint">明暗2方向の内側シャドウで立体感を演出。図形／ボタン／画像で有効。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ▲ レイヤースタイル・フローティングダイアログ ▲ -->
 </body>
 </html>

@@ -88,6 +88,91 @@ function textExtraCss(props) {
     return s;
 }
 
+// シャドウ系プリセット（種別→CSS値）。Label は text-shadow に使う
+const PRESET_SHADOW_CSS = {
+    light:    '0 4px 10px rgba(0,0,0,0.15)',
+    dark:     '0 8px 15px rgba(0,0,0,0.4)',
+    hard:     '5px 5px 0 rgba(0,0,0,0.45)',
+    diagonal: '10px 10px 14px rgba(0,0,0,0.3)',
+    float:    '0 20px 30px rgba(0,0,0,0.28)',
+};
+
+// ドロップシャドウ(自由/プリセット) ＋ 光彩 ＋ 内側シャドウ ＋ ベベル を
+// 1つの box-shadow(通常) / text-shadow(Label) に合成して返す。
+function combinedShadowDecl(props, type) {
+    const isText = (type === 'Label');
+    const box = [];   // box-shadow の各層
+    const txt = [];   // text-shadow の各層
+
+    // 1) ドロップシャドウ（自由値優先、無ければプリセット）
+    const ds = props.dropShadow;
+    if (ds && ds.on) {
+        const dx = parseFloat(ds.x) || 0, dy = parseFloat(ds.y) || 0;
+        const dblur = Math.max(0, parseFloat(ds.blur) || 0), dspread = parseFloat(ds.spread) || 0;
+        const drgba = hexToRgba(ds.color || '#000000', ds.opacity ?? 0.35);
+        if (isText) txt.push(`${dx}px ${dy}px ${dblur}px ${drgba}`);              // text-shadow はスプレッド非対応
+        else        box.push(`${dx}px ${dy}px ${dblur}px ${dspread}px ${drgba}`);
+    } else if (PRESET_SHADOW_CSS[props.shadow]) {
+        (isText ? txt : box).push(PRESET_SHADOW_CSS[props.shadow]);
+    }
+
+    // 2) 光彩（外側グロー）
+    const gl = props.glow;
+    if (gl && gl.on) {
+        const grgba = hexToRgba(gl.color || '#00d0ff', gl.opacity ?? 0.8);
+        const gblur = Math.max(0, parseFloat(gl.blur) || 0), gspread = parseFloat(gl.spread) || 0;
+        if (isText) txt.push(`0 0 ${gblur}px ${grgba}`);
+        else        box.push(`0 0 ${gblur}px ${gspread}px ${grgba}`);
+    }
+
+    // 3) 内側シャドウ（テキスト非対応）
+    const is = props.innerShadow;
+    if (is && is.on && !isText) {
+        const ix = parseFloat(is.x) || 0, iy = parseFloat(is.y) || 0;
+        const iblur = Math.max(0, parseFloat(is.blur) || 0);
+        const irgba = hexToRgba(is.color || '#000000', is.opacity ?? 0.4);
+        box.push(`inset ${ix}px ${iy}px ${iblur}px ${irgba}`);
+    }
+
+    // 4) ベベル＆エンボス（テキスト非対応）: 明暗2方向の内側シャドウで立体感
+    const bv = props.bevel;
+    if (bv && bv.on && !isText) {
+        const d = Math.max(1, parseFloat(bv.depth) || 1);
+        const op = Math.min(1, Math.max(0, bv.opacity ?? 0.5));
+        const hl = hexToRgba(bv.highlight || '#ffffff', op);
+        const sh = hexToRgba(bv.shadow || '#000000', op);
+        const blur = d * 2;
+        if (bv.dir === 'down') {   // 凹（くぼみ）: 左上=影 / 右下=ハイライト
+            box.push(`inset ${d}px ${d}px ${blur}px ${sh}`);
+            box.push(`inset -${d}px -${d}px ${blur}px ${hl}`);
+        } else {                   // 凸（浮き出し）: 左上=ハイライト / 右下=影
+            box.push(`inset ${d}px ${d}px ${blur}px ${hl}`);
+            box.push(`inset -${d}px -${d}px ${blur}px ${sh}`);
+        }
+    }
+
+    const arr = isText ? txt : box;
+    if (arr.length === 0) return '';
+    return (isText ? 'text-shadow: ' : 'box-shadow: ') + arr.join(', ') + ';';
+}
+
+// グラデーション文字（文字自体をグラデ塗り）。文字を包む <span> に付けるスタイルを返す。
+// off または未設定なら ''。背景クリップと衝突するため必ず span へ適用する。
+function gradTextSpanStyle(props) {
+    const g = props.gradText;
+    if (!g || !g.on) return '';
+    const c1 = escapeHtml(g.c1 || '#ff6ec4'), c2 = escapeHtml(g.c2 || '#7873f5');
+    const DEG = { v: 180, h: 90, d1: 135, d2: 225 };
+    const deg = DEG[g.dir] ?? 90;
+    return `background: linear-gradient(${deg}deg, ${c1}, ${c2}); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;`;
+}
+
+// テキストをグラデ文字 span で包む（off ならそのまま返す）
+function wrapGradText(text, props) {
+    const st = gradTextSpanStyle(props);
+    return st ? `<span style="${st}">${text}</span>` : text;
+}
+
 // シーンデータ（1ページ分: canvas/bgColor/seo/elements）を受け取り、
 // 完成したHTML文字列を生成するエンジン。
 //   - sceneData: { canvas, bgColor, seo, elements, formAction? }
@@ -372,28 +457,8 @@ render() {
                 animClass += ' anim-' + String(props.animation).toLowerCase();
             }
 
-            const shadow = props.shadow || 'none';
-            // シャドウ種別 → CSS値（offset x/y, blur, alpha）。Label は text-shadow を使う
-            const SHADOW_CSS = {
-                light:    '0 4px 10px rgba(0,0,0,0.15)',
-                dark:     '0 8px 15px rgba(0,0,0,0.4)',
-                hard:     '5px 5px 0 rgba(0,0,0,0.45)',
-                diagonal: '10px 10px 14px rgba(0,0,0,0.3)',
-                float:    '0 20px 30px rgba(0,0,0,0.28)',
-            };
-            let shadowStyle = '';
-            const ds = props.dropShadow;
-            if (ds && ds.on) {
-                // 自由値ドロップシャドウ（プリセットより優先）
-                const dx = parseFloat(ds.x) || 0, dy = parseFloat(ds.y) || 0;
-                const dblur = Math.max(0, parseFloat(ds.blur) || 0), dspread = parseFloat(ds.spread) || 0;
-                const drgba = hexToRgba(ds.color || '#000000', ds.opacity ?? 0.35);
-                shadowStyle = (type === 'Label')
-                    ? `text-shadow: ${dx}px ${dy}px ${dblur}px ${drgba};`               // text-shadow はスプレッド非対応
-                    : `box-shadow: ${dx}px ${dy}px ${dblur}px ${dspread}px ${drgba};`;
-            } else if (SHADOW_CSS[shadow]) {
-                shadowStyle = (type === 'Label' ? 'text-shadow: ' : 'box-shadow: ') + SHADOW_CSS[shadow] + ';';
-            }
+            // ドロップシャドウ/プリセット＋光彩＋内側シャドウ＋ベベルを合成した影スタイル
+            const shadowStyle = combinedShadowDecl(props, type);
 
             // width等を除いたベーススタイル
             let baseStyle = `position: absolute; box-sizing: border-box;`;
@@ -487,12 +552,14 @@ render() {
         const btnR = Math.max(0, parseInt(props.cornerRadius ?? 8) || 0);
         const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: ${btnR}px; cursor: pointer; font-weight: ${props.fontWeight || 'bold'}; text-align: ${align}; ${shadowStyle}${strokeDecl(props, 'Button')}${textExtraCss(props)}`;
         const formStyle = `margin: 0; position: absolute; width: 100%; height: 100%;`;
+        // グラデ文字はボタン背景と衝突するため、文字を span で包んで適用する
+        const btnText = wrapGradText(text, props);
 
         // 送信ボタン: ページ全体を包む <form>（render側で出力）が送信を担うので
         // ここでは type="submit" のボタンを置くだけ。リンクや内部フォームは付けない。
         if (props.role === 'submit') {
             let out = `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background:none;">\n`;
-            out += `${indent}    <button type="submit" style="${btnStyle} ${formStyle}">${text}</button>\n`;
+            out += `${indent}    <button type="submit" style="${btnStyle} ${formStyle}">${btnText}</button>\n`;
             out += `${indent}</div>\n`;
             return out;
         }
@@ -501,7 +568,7 @@ render() {
         const url = escapeHtml(props.route && props.route !== '#' ? props.route : '#');
         let out = `${indent}<div id="${id}" class="${animClass}" style="${baseStyle} background:none;">\n`;
         out += `${indent}    <a href="${url}" style="${formStyle} display:block; text-decoration:none;">\n`;
-        out += `${indent}        <button type="button" style="${btnStyle}">${text}</button>\n`;
+        out += `${indent}        <button type="button" style="${btnStyle}">${btnText}</button>\n`;
         out += `${indent}    </a>\n`;
         out += `${indent}</div>\n`;
         return out;
@@ -531,7 +598,8 @@ render() {
     // テキスト（見出し・本文）。単純な div として出力する。
     renderLabel(id, animClass, baseStyle, color, text, props, shadowStyle, indent) {
         const style = `${baseStyle} display: block; overflow: hidden; ${shadowStyle} font-weight: ${props.fontWeight || 'normal'};${textExtraCss(props)}`;
-        return `${indent}<div id="${id}" class="${animClass}" style="${style}">${text}</div>\n`;
+        // グラデ文字は背景クリップと衝突するため、文字を span で包んで適用する
+        return `${indent}<div id="${id}" class="${animClass}" style="${style}">${wrapGradText(text, props)}</div>\n`;
     }
 
     // 画像。object-fit:contain で「拡大・切り取りせず全体表示」（縦横比維持）。

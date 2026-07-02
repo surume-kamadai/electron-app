@@ -5,7 +5,7 @@ import { layer, tr } from './canvas.js';
 import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
 import { saveHistory } from './history.js';
 import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow } from './elements.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, applyGradText, applyGlow } from './elements.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { showToast } from './toast.js';
 
@@ -252,7 +252,74 @@ export function updateInspectorFromNode() {
         }
     }
 
+    // ▼ グラデーション文字（テキスト系）
+    const gtGroup = document.getElementById('group-gradtext');
+    if (gtGroup) {
+        const supports = ['Label', 'Button'].includes(type);
+        gtGroup.style.display = supports ? 'block' : 'none';
+        if (supports) {
+            const g = bData.gradText || {};
+            document.getElementById('ins-gt-on').checked = !!g.on;
+            document.getElementById('ins-gt-dir').value  = g.dir || 'h';
+            setColorInput('ins-gt-c1', g.c1, '#ff6ec4');
+            setColorInput('ins-gt-c2', g.c2, '#7873f5');
+            document.getElementById('gradtext-fields').style.display = g.on ? 'block' : 'none';
+        }
+    }
+
+    // ▼ 内側シャドウ（図形/ボタン/画像）
+    const isGroup = document.getElementById('group-innershadow');
+    if (isGroup) {
+        const supports = ['Rect', 'Circle', 'Button', 'Image'].includes(type);
+        isGroup.style.display = supports ? 'block' : 'none';
+        if (supports) {
+            const s = bData.innerShadow || {};
+            document.getElementById('ins-is-on').checked    = !!s.on;
+            document.getElementById('ins-is-x').value       = parseFloat(s.x ?? 0);
+            document.getElementById('ins-is-y').value       = parseFloat(s.y ?? 3);
+            document.getElementById('ins-is-blur').value    = Math.max(0, parseFloat(s.blur ?? 6));
+            document.getElementById('ins-is-opacity').value = Math.min(1, Math.max(0, s.opacity ?? 0.4));
+            setColorInput('ins-is-color', s.color, '#000000');
+            document.getElementById('innershadow-fields').style.display = s.on ? 'block' : 'none';
+        }
+    }
+
+    // ▼ 光彩（グロー）（図形/ボタン/画像/テキスト）
+    const glowGroup = document.getElementById('group-glow');
+    if (glowGroup) {
+        const supports = ['Rect', 'Circle', 'Button', 'Image', 'Label'].includes(type);
+        glowGroup.style.display = supports ? 'block' : 'none';
+        if (supports) {
+            const g = bData.glow || {};
+            document.getElementById('ins-glow-on').checked    = !!g.on;
+            document.getElementById('ins-glow-blur').value    = Math.max(0, parseFloat(g.blur ?? 12));
+            document.getElementById('ins-glow-spread').value  = parseFloat(g.spread ?? 0);
+            document.getElementById('ins-glow-opacity').value = Math.min(1, Math.max(0, g.opacity ?? 0.8));
+            setColorInput('ins-glow-color', g.color, '#00d0ff');
+            document.getElementById('glow-fields').style.display = g.on ? 'block' : 'none';
+        }
+    }
+
+    // ▼ ベベル＆エンボス（図形/ボタン/画像）
+    const bevelGroup = document.getElementById('group-bevel');
+    if (bevelGroup) {
+        const supports = ['Rect', 'Circle', 'Button', 'Image'].includes(type);
+        bevelGroup.style.display = supports ? 'block' : 'none';
+        if (supports) {
+            const b = bData.bevel || {};
+            document.getElementById('ins-bevel-on').checked    = !!b.on;
+            document.getElementById('ins-bevel-depth').value   = Math.max(1, parseFloat(b.depth ?? 4));
+            document.getElementById('ins-bevel-dir').value     = b.dir || 'up';
+            setColorInput('ins-bevel-hl', b.highlight, '#ffffff');
+            setColorInput('ins-bevel-sh', b.shadow, '#000000');
+            document.getElementById('ins-bevel-opacity').value = Math.min(1, Math.max(0, b.opacity ?? 0.5));
+            document.getElementById('bevel-fields').style.display = b.on ? 'block' : 'none';
+        }
+    }
+
     renderEventList(node);
+    // レイヤースタイル・ダイアログが開いていれば本体/案内の表示を同期
+    window.__syncLayerStyleDialog?.();
 }
 
 export function onInspectorUpdate(shouldSaveHistory = true) {
@@ -454,6 +521,50 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
         // チェックON/種類変更に応じて詳細欄の表示を即時に切り替える（再選択を待たない）
         document.getElementById('grad-fields').style.display   = bData.gradient.on ? 'block' : 'none';
         document.getElementById('grad-dir-wrap').style.display = (bData.gradient.type === 'radial') ? 'none' : 'block';
+    }
+
+    // グラデーション文字（テキスト系）の保存と適用（単色fillの後に上書き）
+    if (['Label', 'Button'].includes(type)) {
+        if (!bData.gradText) bData.gradText = {};
+        bData.gradText.on  = document.getElementById('ins-gt-on').checked;
+        bData.gradText.dir = document.getElementById('ins-gt-dir').value;
+        bData.gradText.c1  = document.getElementById('ins-gt-c1').value;
+        bData.gradText.c2  = document.getElementById('ins-gt-c2').value;
+        applyGradText(node, bData);
+        document.getElementById('gradtext-fields').style.display = bData.gradText.on ? 'block' : 'none';
+    }
+
+    // 内側シャドウ / ベベル（Konva非対応のため出力CSSで反映。エディタ表示は近似なし）
+    if (['Rect', 'Circle', 'Button', 'Image'].includes(type)) {
+        if (!bData.innerShadow) bData.innerShadow = {};
+        bData.innerShadow.on      = document.getElementById('ins-is-on').checked;
+        bData.innerShadow.x       = parseFloat(document.getElementById('ins-is-x').value) || 0;
+        bData.innerShadow.y       = parseFloat(document.getElementById('ins-is-y').value) || 0;
+        bData.innerShadow.blur    = Math.max(0, parseFloat(document.getElementById('ins-is-blur').value) || 0);
+        bData.innerShadow.color   = document.getElementById('ins-is-color').value;
+        bData.innerShadow.opacity = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-is-opacity').value) || 0));
+        document.getElementById('innershadow-fields').style.display = bData.innerShadow.on ? 'block' : 'none';
+
+        if (!bData.bevel) bData.bevel = {};
+        bData.bevel.on        = document.getElementById('ins-bevel-on').checked;
+        bData.bevel.depth     = Math.max(1, parseFloat(document.getElementById('ins-bevel-depth').value) || 1);
+        bData.bevel.dir       = document.getElementById('ins-bevel-dir').value;
+        bData.bevel.highlight = document.getElementById('ins-bevel-hl').value;
+        bData.bevel.shadow    = document.getElementById('ins-bevel-sh').value;
+        bData.bevel.opacity   = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-bevel-opacity').value) || 0));
+        document.getElementById('bevel-fields').style.display = bData.bevel.on ? 'block' : 'none';
+    }
+
+    // 光彩（グロー）の保存と適用（テキスト含む。ドロップシャドウが優先）
+    if (['Rect', 'Circle', 'Button', 'Image', 'Label'].includes(type)) {
+        if (!bData.glow) bData.glow = {};
+        bData.glow.on      = document.getElementById('ins-glow-on').checked;
+        bData.glow.blur    = Math.max(0, parseFloat(document.getElementById('ins-glow-blur').value) || 0);
+        bData.glow.spread  = parseFloat(document.getElementById('ins-glow-spread').value) || 0;
+        bData.glow.color   = document.getElementById('ins-glow-color').value;
+        bData.glow.opacity = Math.min(1, Math.max(0, parseFloat(document.getElementById('ins-glow-opacity').value) || 0));
+        applyGlow(node, bData);
+        document.getElementById('glow-fields').style.display = bData.glow.on ? 'block' : 'none';
     }
 
     node.setAttr('bladeData', bData);
