@@ -3,7 +3,7 @@
 // ボタン構成をページパネルと統一: 👁️(表示) 🔒(ロック) ✎(名前変更) ×(削除)
 // ============================================================
 import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode, setElementCount } from './state.js';
+import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode } from './state.js';
 import { applySelectedNodes } from './elements.js';
 import { updateInspectorFromNode, hideInspector } from './inspector.js';
 import { saveHistory } from './history.js';
@@ -246,8 +246,6 @@ function createLayerItem(node, container, depth) {
             tr.nodes([]);
             hideInspector();
         }
-        // 全要素が消えたら連番をリセット
-        if (layer.find('.ui-element').length === 0) setElementCount(0);
         renderExplorer();
         layer.batchDraw();
         saveHistory();

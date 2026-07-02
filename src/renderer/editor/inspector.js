@@ -2,10 +2,10 @@
 // インスペクター (プロパティパネル)
 // ============================================================
 import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, currentDevice, setElementCount } from './state.js';
+import { selectedNodes, setSelectedNodes, currentDevice } from './state.js';
 import { saveHistory } from './history.js';
 import { renderExplorer } from './explorer.js';
-import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow, toRgba } from './elements.js';
+import { applyNodeShadow, applyTextStyle, applyImageCover, applyGradient, applyCornerRadius, applyStroke, applyDropShadow } from './elements.js';
 import { markMobileEdited, updatePcGeom } from './display.js';
 import { showToast } from './toast.js';
 
@@ -33,33 +33,6 @@ function setColorInput(id, val, def) {
     }
 }
 
-// 色文字列(#rrggbb または rgba(...)) を { hex, a } に分解
-function parseHexA(str, def) {
-    str = String(str ?? '').trim();
-    let m = str.match(/^#([0-9a-fA-F]{6})$/);
-    if (m) return { hex: '#' + m[1], a: 1 };
-    m = str.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?/i);
-    if (m) {
-        const h = v => Math.max(0, Math.min(255, +v)).toString(16).padStart(2, '0');
-        return { hex: '#' + h(m[1]) + h(m[2]) + h(m[3]), a: m[4] != null ? parseFloat(m[4]) : 1 };
-    }
-    return { hex: def || '#000000', a: 1 };
-}
-
-// 色(rgba/hex) → ネイティブ色ピッカー(hex) ＋ A欄(0〜1) へ反映
-function setColorA(colorId, alphaId, value, def) {
-    const { hex, a } = parseHexA(value || def, def);
-    setColorInput(colorId, hex, def);
-    const ael = document.getElementById(alphaId);
-    if (ael) ael.value = a;
-}
-
-// ネイティブ色ピッカー(hex) ＋ A欄 → rgba(...)（Aが1なら hex のまま）
-function getColorA(colorId, alphaId) {
-    const hex = document.getElementById(colorId)?.value || '#000000';
-    const a = Math.min(1, Math.max(0, parseFloat(document.getElementById(alphaId)?.value ?? 1)));
-    return toRgba(hex, a);
-}
 
 export function hideInspector() {
     document.getElementById('ins-fields').style.display = 'none';
@@ -407,7 +380,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
 
     if (type === 'Label') {
         node.text(bData.text);
-        node.fill(toRgba(bData.color, bData.textAlpha));
+        node.fill(bData.color);
         node.fontSize(displayFontsize);
     } else if (type === 'Button') {
         const bg = node.findOne('.btn-bg');
@@ -427,7 +400,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
             txt.width(node.width());
             txt.height(node.height());
             txt.text(bData.text);
-            txt.fill(toRgba(bData.color, bData.textAlpha));
+            txt.fill(bData.color);
             txt.fontSize(displayFontsize);
         }
     } else if (type === 'Rect') {
@@ -922,8 +895,6 @@ export function deleteSelectedNode() {
     setSelectedNodes([]);
     tr.nodes([]);
     hideInspector();
-    // 全要素が消えたら連番をリセット（次に作る要素が1から始まる）
-    if (layer.find('.ui-element').length === 0) setElementCount(0);
     renderExplorer();
     layer.batchDraw();
     saveHistory();

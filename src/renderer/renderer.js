@@ -52,11 +52,7 @@ function gradientBgDecl(props, bgcolorEscaped) {
         const DEG = { v: 180, h: 90, d1: 135, d2: 225 };
         return `background: linear-gradient(${DEG[g.dir] ?? 180}deg, ${c1}, ${c2});`;
     }
-    // 背景の透明度（bgAlpha<1）は rgba() で出力
-    const bgA = props.bgAlpha;
-    if (bgA != null && bgA < 1 && /^#[0-9a-fA-F]{6}$/.test(props.bgcolor || '')) {
-        return `background-color: ${hexToRgba(props.bgcolor, bgA)};`;
-    }
+    // bgcolor は #rrggbb か rgba(...)（透明度はピッカー内で色に含まれる）
     return `background-color: ${bgcolorEscaped};`;
 }
 
@@ -355,9 +351,6 @@ render() {
             const radiusCss = cornerR ? ` border-radius: ${cornerR}px;` : '';
             const strokeCss = strokeDecl(props, type);
             const color    = escapeHtml(props.color ?? 'inherit');
-            // 文字色の透明度（textAlpha<1）は rgba()
-            const colorVal = (props.textAlpha != null && props.textAlpha < 1 && /^#[0-9a-fA-F]{6}$/.test(props.color || ''))
-                ? hexToRgba(props.color, props.textAlpha) : color;
             const align    = escapeHtml(props.align || (type === 'Button' ? 'center' : 'left'));
             const fontfam  = escapeHtml(props.fontfamily || 'sans-serif');
             // 使用中の Google Font を検出（出力headに<link>する）
@@ -396,7 +389,7 @@ render() {
             let baseStyle = `position: absolute; box-sizing: border-box;`;
             // Group / ArticleGrid / Accordion は自前でレイアウトを組むので baseStyle に背景を付けない
             if (type !== 'Group' && type !== 'ArticleGrid' && type !== 'Accordion' && type !== 'Triangle') {
-                baseStyle += ` ${bgFill} color: ${colorVal}; text-align: ${align}; font-family: ${fontfam};`;
+                baseStyle += ` ${bgFill} color: ${color}; text-align: ${align}; font-family: ${fontfam};`;
                 if (type !== 'Button' && type !== 'Image') baseStyle += ` ${shadowStyle}`;
             }
             baseStyle += strokeCss;  // 境界線（テキストは文字縁取り、他は border）
@@ -482,9 +475,7 @@ render() {
         // <button> はブラウザ既定で text-align:center になるため、揃え設定を明示する
         const align = escapeHtml(props.align || 'center');
         const btnR = Math.max(0, parseInt(props.cornerRadius ?? 8) || 0);
-        const btnColor = (props.textAlpha != null && props.textAlpha < 1 && /^#[0-9a-fA-F]{6}$/.test(props.color || ''))
-            ? hexToRgba(props.color, props.textAlpha) : color;
-        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${btnColor}; font-size: inherit; border: none; border-radius: ${btnR}px; cursor: pointer; font-weight: bold; text-align: ${align}; ${shadowStyle}${strokeDecl(props, 'Button')}`;
+        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: ${btnR}px; cursor: pointer; font-weight: bold; text-align: ${align}; ${shadowStyle}${strokeDecl(props, 'Button')}`;
         const formStyle = `margin: 0; position: absolute; width: 100%; height: 100%;`;
 
         // 送信ボタン: ページ全体を包む <form>（render側で出力）が送信を担うので

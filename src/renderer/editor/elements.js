@@ -2,7 +2,7 @@
 // 要素の生成・グループ化・解除
 // ============================================================
 import { layer, tr } from './canvas.js';
-import { selectedNodes, setSelectedNodes, incrementElementCount } from './state.js';
+import { selectedNodes, setSelectedNodes } from './state.js';
 import { saveHistory } from './history.js';
 import { updateInspectorFromNode } from './inspector.js';
 import { renderExplorer } from './explorer.js';
@@ -89,8 +89,6 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         text:     type === 'Image' ? 'https://placehold.co/150x150/png' : 'テキスト',
         bgcolor:  DEFAULT_PROPS[type]?.bgcolor  ?? '#ffffff',
         color:    '#000000',
-        bgAlpha:  1,   // 背景色の不透明度
-        textAlpha:1,   // 文字色の不透明度
         fontsize: 16,
         align:    'left',
         fontfamily:'sans-serif',
@@ -177,7 +175,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             const txt = new Konva.Text({
                 x: 0, y: 0,
                 width: base.width, height: base.height,
-                text: bData.text, fill: toRgba(bData.color, bData.textAlpha), fontSize: bData.fontsize,
+                text: bData.text, fill: bData.color, fontSize: bData.fontsize,
                 align: bData.align || 'center',
                 fontFamily: bData.fontfamily || 'sans-serif',
                 verticalAlign: 'middle',
@@ -188,7 +186,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
             break;
         }
         case 'TextInput': newNode = new Konva.Rect({ ...base, fill: '#fff', stroke: '#ccc', strokeWidth: 1 }); break;
-        case 'Label':     newNode = new Konva.Text({ ...base, text: bData.text, fill: toRgba(bData.color, bData.textAlpha), fontSize: bData.fontsize, align: bData.align || 'left', fontFamily: bData.fontfamily || 'sans-serif' }); break;
+        case 'Label':     newNode = new Konva.Text({ ...base, text: bData.text, fill: bData.color, fontSize: bData.fontsize, align: bData.align || 'left', fontFamily: bData.fontfamily || 'sans-serif' }); break;
         case 'Rect':      newNode = new Konva.Rect({ ...base, fill: bData.bgcolor, cornerRadius: bData.cornerRadius || 0 }); break;
         case 'Warp': {
             const pts = bData.warpPoints || [
@@ -477,17 +475,6 @@ export function applyNodeShadow(node, shadowType) {
     }
 }
 
-// #rrggbb + アルファ(0〜1) → 不透明なら hex のまま、半透明なら rgba() を返す。
-// 非hex(transparent 等)や未指定は元の値をそのまま返す。
-export function toRgba(hex, alpha) {
-    const a = (alpha == null) ? 1 : Math.min(1, Math.max(0, parseFloat(alpha)));
-    if (!/^#[0-9a-fA-F]{6}$/.test(String(hex))) return hex;
-    if (a >= 1) return hex;
-    const n = hex.slice(1);
-    const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${a})`;
-}
-
 // グラデーション（線形/放射状）をノードへ適用。off なら単色塗りに戻す。
 // 対象: Rect / Circle / Triangle / Button(内部bg)。Image はDOMオーバーレイ側で描画する。
 export function applyGradient(node, bData) {
@@ -505,7 +492,7 @@ export function applyGradient(node, bData) {
     const g = bData.gradient;
     if (!g || !g.on) {
         target.fillPriority('color');
-        const bg = toRgba(bData.bgcolor, bData.bgAlpha);
+        const bg = bData.bgcolor;
         target.fill(type === 'Button' ? (bData.bgimage ? null : bg) : bg);
         node.getLayer()?.batchDraw();
         return;
