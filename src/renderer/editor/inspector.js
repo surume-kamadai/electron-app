@@ -34,7 +34,13 @@ function setColorInput(id, val, def) {
 }
 
 
+// いま各入力フィールドが表しているノードのid。
+// 選択直後などに、まだ前ノードの値が残ったフィールドで onInspectorUpdate が
+// 走って設定が別オブジェクトへ「移ってしまう」のを防ぐためのガードに使う。
+let inspectorNodeId = null;
+
 export function hideInspector() {
+    inspectorNodeId = null;
     document.getElementById('ins-fields').style.display = 'none';
     document.getElementById('ins-empty').style.display  = 'block';
 }
@@ -46,6 +52,7 @@ export function updateInspectorFromNode() {
     document.getElementById('ins-empty').style.display  = 'none';
 
     if (selectedNodes.length > 1) {
+        inspectorNodeId = null;
         document.getElementById('ins-fields-single').style.display = 'none';
         document.getElementById('ins-fields-multi').style.display  = 'block';
         return;
@@ -55,6 +62,8 @@ export function updateInspectorFromNode() {
     document.getElementById('ins-fields-multi').style.display  = 'none';
 
     const node  = selectedNodes[0];
+    // これ以降のフィールドはこのノードの値で埋める（ガード用に記録）
+    inspectorNodeId = node.id();
     const bData = node.getAttr('bladeData');
     const type  = node.getAttr('uiType');
 
@@ -325,6 +334,12 @@ export function updateInspectorFromNode() {
 export function onInspectorUpdate(shouldSaveHistory = true) {
     if (selectedNodes.length !== 1) return;
     const node  = selectedNodes[0];
+
+    // フィールドがまだこのノードの値で埋まっていない（＝選択直後に前ノード由来の
+    // stale なイベントが来た）場合は書き込まず、正しい値で作り直す。
+    // これで「Aの設定を触った直後にBを選ぶとBへ移る」現象を防ぐ。
+    if (inspectorNodeId !== node.id()) { updateInspectorFromNode(); return; }
+
     const bData = node.getAttr('bladeData');
 
     bData.name     = document.getElementById('ins-name').value;
@@ -534,7 +549,7 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
         document.getElementById('gradtext-fields').style.display = bData.gradText.on ? 'block' : 'none';
     }
 
-    // 内側シャドウ / ベベル（Konva非対応のため出力CSSで反映。エディタ表示は近似なし）
+    // 内側シャドウ / ベベル（Konva非対応。effect-overlay.js のDOM層でプレビュー＋出力CSSで反映）
     if (['Rect', 'Circle', 'Button', 'Image'].includes(type)) {
         if (!bData.innerShadow) bData.innerShadow = {};
         bData.innerShadow.on      = document.getElementById('ins-is-on').checked;

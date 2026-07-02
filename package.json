@@ -1,13 +1,12 @@
 {
   "name": "site-builder",
-  "version": "1.0.8",
+  "version": "1.0.10",
   "description": "GUIでデザインしてHTML/Laravel Bladeを生成するサイトビルダー",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder",
-    
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac"
   },
