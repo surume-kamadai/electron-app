@@ -4,16 +4,16 @@
 // ============================================================
 import { stage, layer, tr, selectionRect } from '../canvas/canvas.js';
 import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from '../app/state.js';
-import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, nextNumberForType, makeTypeCounter } from '../nodes/elements.js';
-import { applyImageCover, applyGradient } from '../nodes/node-style.js';
+import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, nextNumberForType } from '../nodes/elements.js';
 import { saveHistory, undo, redo } from '../history/history.js';
-import { updateInspectorFromNode, deleteSelectedNode } from '../inspector/inspector.js';
+import { deleteSelectedNode } from '../inspector/inspector.js';
 import { renderExplorer } from '../explorer/explorer.js';
 import { saveAndExport, importJSON, uploadImage } from '../project/api.js';
 import { showToast } from '../ui/toast.js';
-import { processNode } from '../nodes/converter.js';
-import { markMobileEdited, updatePcGeom } from '../canvas/display.js';
 import { exitWarpMode, isWarpMode, getWarpTarget } from '../nodes/warp.js';
+import { finalizeAfterTransform } from './transform-normalize.js';
+import { startInlineTextEdit } from './text-edit.js';
+import { copySelected, pasteClipboard } from './clipboard.js';
 
 // ============================================================
 // ステージ: トランスフォーム完了時のグループスケール正規化
@@ -22,105 +22,6 @@ import { exitWarpMode, isWarpMode, getWarpTarget } from '../nodes/warp.js';
 // Label / Button のリサイズを「scale」から「width/height + fontSize」へ正規化する。
 // ドラッグ中(transform)に毎フレーム呼ぶことで、スケール操作中もリアルタイムに
 // 文字サイズが変わる。フォント倍率は縦横の大きい方に追従（どの方向でも変化）。
-function normalizeResize(node) {
-    const type = node.getAttr('uiType');
-    const sx = node.scaleX(), sy = node.scaleY();
-    if (sx === 1 && sy === 1) return;
-
-    // フォント倍率: どの方向のドラッグでも文字サイズが変わるよう、縦横の大きい方を使う
-    const fontFactor = Math.max(sx, sy);
-
-    if (type === 'Label') {
-        node.width(Math.max(5, node.width()  * sx));
-        node.height(Math.max(5, node.height() * sy));
-        node.scaleX(1); node.scaleY(1);
-        const newFont = Math.max(8, node.fontSize() * fontFactor);
-        node.fontSize(newFont);
-        const b = node.getAttr('bladeData'); if (b) b.fontsize = newFont;
-    } else if (type === 'Button') {
-        node.width(Math.max(5, node.width()  * sx));
-        node.height(Math.max(5, node.height() * sy));
-        node.scaleX(1); node.scaleY(1);
-        const bg  = node.findOne('.btn-bg');
-        const txt = node.findOne('.btn-text');
-        if (bg) { bg.width(node.width()); bg.height(node.height()); }
-        if (txt) {
-            txt.width(node.width()); txt.height(node.height());
-            const newFont = Math.max(8, txt.fontSize() * fontFactor);
-            txt.fontSize(newFont);
-            const b = node.getAttr('bladeData'); if (b) b.fontsize = newFont;
-        }
-    }
-}
-
-// ※ ドラッグ中のリアルタイム正規化は、Transformer の内部計算と干渉して
-//    フォント倍率が累積・巨大化するため行わない。整形は完了時(transformend)に
-//    一度だけ行う（下の tr.on('transformend')）。
-
-// 1ノードのスケールを width/height(+font) に正規化する（Image はカバー再計算）
-function normalizeNode(node) {
-    const type = node.getAttr('uiType');
-    if (type === 'Image') {
-        // スケールを width/height に確定してから、アスペクト維持で表示を整える
-        const sx = node.scaleX(), sy = node.scaleY();
-        if (sx !== 1 || sy !== 1) {
-            node.width(node.width() * sx);
-            node.height(node.height() * sy);
-            node.scaleX(1); node.scaleY(1);
-        }
-        applyImageCover(node);
-        return;
-    }
-    if (type === 'Label' || type === 'Button') { normalizeResize(node); return; }
-    if (type === 'Triangle') {
-        // ハンドルでの拡大縮小(scale)を width/height に確定する（幅・高さが正しく反映される）
-        const sx = node.scaleX(), sy = node.scaleY();
-        if (sx !== 1 || sy !== 1) {
-            node.width(Math.max(5, node.width() * sx));
-            node.height(Math.max(5, node.height() * sy));
-            node.scaleX(1); node.scaleY(1);
-        }
-        return;
-    }
-    if (type !== 'Group') return;
-
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
-    if (scaleX === 1 && scaleY === 1) return;
-    node.getChildren().forEach(child => {
-        if (!child.hasName('ui-element')) return;
-        child.x(child.x() * scaleX);
-        child.y(child.y() * scaleY);
-        child.width(child.width()  * scaleX);
-        child.height(child.height() * scaleY);
-        const childType = child.getAttr('uiType');
-        if (childType === 'Label') {
-            child.fontSize(child.fontSize() * Math.max(scaleX, scaleY));
-            child.getAttr('bladeData').fontsize = child.fontSize();
-        } else if (childType === 'Button') {
-            const bg = child.findOne('.btn-bg');
-            const txt = child.findOne('.btn-text');
-            if (bg) { bg.width(child.width()); bg.height(child.height()); }
-            if (txt) { txt.width(child.width()); txt.height(child.height()); }
-        }
-    });
-    node.width(node.width()   * scaleX);
-    node.height(node.height() * scaleY);
-    node.scaleX(1);
-    node.scaleY(1);
-}
-
-// 変形/移動の完了処理（正規化→インスペクタ更新→履歴保存）
-function finalizeAfterTransform(nodes) {
-    nodes.forEach(normalizeNode);
-    // サイズが変わったのでグラデーションの起点/終点を再計算
-    nodes.forEach(n => applyGradient(n, n.getAttr('bladeData')));
-    updateInspectorFromNode();
-    renderExplorer();
-    layer.batchDraw();
-    nodes.forEach(node => { updatePcGeom(node); markMobileEdited(node); });
-    saveHistory();
-}
 
 // リサイズ完了（Transformer のイベントを直接使う＝stageに届かない環境でも確実）
 tr.on('transformend', () => {
@@ -470,82 +371,6 @@ stage.on('dblclick dbltap', e => {
     startInlineTextEdit(node);
 });
 
-function startInlineTextEdit(node) {
-    const bData = node.getAttr('bladeData');
-    if (!bData) return;
-
-    // 既存inputがあれば閉じる
-    document.querySelector('.inline-text-editor')?.remove();
-
-    // Canvas上の絶対位置を計算
-    const stageBox = stage.container().getBoundingClientRect();
-    const wrapperBox = document.getElementById('canvas-wrapper').getBoundingClientRect();
-    const zoom = stage.scaleX();
-    const absPos = node.getAbsolutePosition();
-    const w = node.width() * zoom;
-    const h = node.height() * zoom;
-
-    const input = document.createElement(node.getAttr('uiType') === 'Label' ? 'textarea' : 'input');
-    input.className = 'inline-text-editor';
-    input.value = bData.text || '';
-    Object.assign(input.style, {
-        position: 'fixed',
-        left: (stageBox.left + absPos.x * zoom) + 'px',
-        top:  (stageBox.top  + absPos.y * zoom) + 'px',
-        width:  Math.max(80, w) + 'px',
-        height: Math.max(30, h) + 'px',
-        fontSize: (bData.fontsize || 16) + 'px',
-        fontFamily: bData.fontfamily || 'sans-serif',
-        color: bData.color || '#000',
-        background: '#fff',
-        border: '2px solid #007acc',
-        borderRadius: '3px',
-        padding: '2px 4px',
-        boxSizing: 'border-box',
-        zIndex: 99999,
-        outline: 'none',
-        resize: 'none',
-        textAlign: bData.align || 'left',
-    });
-    document.body.appendChild(input);
-    input.focus();
-    input.select();
-
-    const commit = () => {
-        const v = input.value;
-        bData.text = v;
-        node.setAttr('bladeData', bData);
-        // Konva側の描画も更新
-        if (node.getAttr('uiType') === 'Label') {
-            node.text(v);
-        } else if (node.getAttr('uiType') === 'Button') {
-            const txt = node.findOne('.btn-text');
-            if (txt) txt.text(v);
-        }
-        layer.batchDraw();
-        // インスペクタも更新
-        updateInspectorFromNode();
-        // 編集デバイス対応のフック
-        updatePcGeom(node);
-        markMobileEdited(node);
-        cleanup();
-        saveHistory();
-    };
-    const cancel = () => cleanup();
-    const cleanup = () => { input.remove(); };
-
-    input.addEventListener('blur', commit);
-    input.addEventListener('keydown', ev => {
-        ev.stopPropagation();
-        if (ev.key === 'Enter' && !ev.shiftKey) {
-            ev.preventDefault();
-            commit();
-        } else if (ev.key === 'Escape') {
-            ev.preventDefault();
-            cancel();
-        }
-    });
-}
 
 document.getElementById('workspace').addEventListener('mousedown', e => {
     // 余白（ワークスペース／ペインやキャンバスの背景）を直接クリックした時だけ選択解除する。
@@ -559,57 +384,6 @@ document.getElementById('workspace').addEventListener('mousedown', e => {
 // ============================================================
 // コピー＆ペースト
 // ============================================================
-let clipboardData = [];
-
-function copySelected() {
-    if (selectedNodes.length === 0) return;
-    clipboardData = selectedNodes.map(node => processNode(node));
-}
-
-function pasteClipboard() {
-    if (clipboardData.length === 0) return;
-    applySelectedNodes([]);
-
-    // 旧ID → 新ID のマップ（イベントターゲット再マッピング用）
-    const idMap = new Map();
-    const nextNum = makeTypeCounter(); // タイプごとに連番で払い出す
-
-    function regenerateIds(data, isRoot) {
-        const newId = data.type.toLowerCase() + '_' + nextNum(data.type);
-        idMap.set(data.id, newId);
-        data.id = newId;
-        if (isRoot) {
-            data.properties.name += ' (コピー)';
-            data.transform.x += 20;
-            data.transform.y += 20;
-        }
-        data.children?.forEach(child => regenerateIds(child, false));
-    }
-
-    // ID再生成（先に全要素のID対応表を作る）
-    const cloned = clipboardData.map(data => JSON.parse(JSON.stringify(data)));
-    cloned.forEach(data => regenerateIds(data, true));
-
-    // 各要素の events.target を idMap で更新（コピー先要素同士の参照を保つ）
-    function remapEvents(data) {
-        const events = data.properties?.events;
-        if (Array.isArray(events)) {
-            events.forEach(ev => {
-                // alert以外（show/hide/toggleなど）はtargetが要素ID
-                if (ev.action !== 'alert' && idMap.has(ev.target)) {
-                    ev.target = idMap.get(ev.target);
-                }
-            });
-        }
-        data.children?.forEach(remapEvents);
-    }
-    cloned.forEach(remapEvents);
-
-    const newSelection = cloned.map(data => spawnElement(data.type, data, layer, false, true));
-
-    applySelectedNodes(newSelection);
-    saveHistory();
-}
 
 // ============================================================
 // キーボードショートカット
