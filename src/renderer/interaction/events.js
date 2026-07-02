@@ -4,7 +4,8 @@
 // ============================================================
 import { stage, layer, tr, selectionRect } from '../canvas/canvas.js';
 import { selectedNodes, setSelectedNodes, lastClickedNode, setLastClickedNode, currentCanvasWidth, currentCanvasHeight } from '../app/state.js';
-import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, applyImageCover, applyGradient, nextNumberForType, makeTypeCounter } from '../nodes/elements.js';
+import { applySelectedNodes, spawnElement, groupNodes, ungroupNodes, nextNumberForType, makeTypeCounter } from '../nodes/elements.js';
+import { applyImageCover, applyGradient } from '../nodes/node-style.js';
 import { saveHistory, undo, redo } from '../history/history.js';
 import { updateInspectorFromNode, deleteSelectedNode } from '../inspector/inspector.js';
 import { renderExplorer } from '../explorer/explorer.js';
