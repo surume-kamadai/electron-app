@@ -29,18 +29,21 @@ export function applySelectedNodes(nodes) {
     // 【Group内子要素のdraggable制御】
     // 子要素は基本ロック (draggable:false)。選択された子だけ一時的に動かせるようにする。
     // これで「Cardをクリック→Cardが動く」「中のLabelをクリック→Labelだけ動く」が両立する。
+    // Space押下中(パンモード)は一切ドラッグ不可にする。
+    // これがないと、Space中にオブジェクトを選択した瞬間ここでdraggableが復活してしまう。
+    const spaceDown = typeof window !== 'undefined' && window.__spaceDown;
     layer.find('.ui-element').forEach(n => {
         const isInGroup = n.parent && n.parent.nodeType === 'Group' && n.parent.hasName('ui-element');
         if (!isInGroup) {
             // ルート直下の要素はロック設定（bData.lock）に従う
             const bData = n.getAttr('bladeData');
-            n.draggable(!(bData && bData.lock));
+            n.draggable(!(bData && bData.lock) && !spaceDown);
         } else {
             // Group内の子: 選択中の子はドラッグ可、それ以外はロック
             const selected = nodes.includes(n);
             const bData = n.getAttr('bladeData');
             const userLocked = !!(bData && bData.lock);
-            n.draggable(selected && !userLocked);
+            n.draggable(selected && !userLocked && !spaceDown);
         }
     });
 
@@ -92,6 +95,11 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
         fontsize: 16,
         align:    'left',
         fontfamily:'sans-serif',
+        fontWeight: type === 'Button' ? 'bold' : 'normal',  // normal | bold
+        italic:    false,
+        underline: false,
+        letterSpacing: 0,   // 字間(px)
+        lineHeight: 1.2,    // 行間(倍率)
         lock:     false,
         route:    '#',
         method:   'POST',
@@ -313,6 +321,7 @@ export function spawnElement(type, loadData = null, parentGroup = layer, isHisto
     applyGradient(newNode, bData);
     applyStroke(newNode, bData);
     applyDropShadow(newNode, bData);
+    applyTextStyle(newNode, bData);   // 太さ/斜体/下線/字間/行間（Label/Button）
 
     newNode.on('dragend transformend', () => {
         updateInspectorFromNode();
@@ -708,18 +717,31 @@ export function applyImageCover(node) {
     }
 }
 
+// テキストノード(Konva.Text)へ 太さ/斜体/下線/字間/行間 を適用
+function applyTextExtras(t, bData) {
+    const parts = [];
+    if (bData.fontWeight === 'bold') parts.push('bold');
+    if (bData.italic) parts.push('italic');
+    t.fontStyle(parts.join(' ') || 'normal');
+    t.textDecoration(bData.underline ? 'underline' : '');
+    t.letterSpacing(parseFloat(bData.letterSpacing) || 0);
+    if (bData.lineHeight) t.lineHeight(parseFloat(bData.lineHeight) || 1);
+}
+
 export function applyTextStyle(node, bData) {
     if (!node) return;
     const type = node.getAttr('uiType');
-    
+
     if (type === 'Label') {
         node.align(bData.align || 'left');
         node.fontFamily(bData.fontfamily || 'sans-serif');
+        applyTextExtras(node, bData);
     } else if (type === 'Button') {
         const txt = node.findOne('.btn-text');
         if (txt) {
             txt.align(bData.align || 'center');
             txt.fontFamily(bData.fontfamily || 'sans-serif');
+            applyTextExtras(txt, bData);
         }
     }
 }

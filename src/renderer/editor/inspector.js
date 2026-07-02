@@ -74,6 +74,11 @@ export function updateInspectorFromNode() {
     if (opacityInput) opacityInput.value = bData.opacity ?? 1;
     document.getElementById('ins-align').value      = bData.align || 'left';
     document.getElementById('ins-fontfamily').value = bData.fontfamily || 'sans-serif';
+    const _fw = document.getElementById('ins-fontweight'); if (_fw) _fw.value = bData.fontWeight || 'normal';
+    const _it = document.getElementById('ins-italic');      if (_it) _it.checked = !!bData.italic;
+    const _ul = document.getElementById('ins-underline');   if (_ul) _ul.checked = !!bData.underline;
+    const _ls = document.getElementById('ins-letterspacing'); if (_ls) _ls.value = bData.letterSpacing ?? 0;
+    const _lh = document.getElementById('ins-lineheight');    if (_lh) _lh.value = bData.lineHeight ?? 1.2;
     
     if (type === 'Label' || type === 'Button') {
         document.getElementById('group-text-align').style.display = 'block';
@@ -285,6 +290,11 @@ export function onInspectorUpdate(shouldSaveHistory = true) {
     }
     bData.align      = document.getElementById('ins-align').value;
     bData.fontfamily = document.getElementById('ins-fontfamily').value;
+    bData.fontWeight = document.getElementById('ins-fontweight')?.value || 'normal';
+    bData.italic     = !!document.getElementById('ins-italic')?.checked;
+    bData.underline  = !!document.getElementById('ins-underline')?.checked;
+    bData.letterSpacing = parseFloat(document.getElementById('ins-letterspacing')?.value) || 0;
+    bData.lineHeight = parseFloat(document.getElementById('ins-lineheight')?.value) || 1.2;
     
     bData.route    = document.getElementById('ins-route').value;
     bData.method   = document.getElementById('ins-method').value;

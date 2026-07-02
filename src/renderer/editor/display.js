@@ -2,8 +2,8 @@
 // キャンバスサイズ / ズーム / パンニング
 // ============================================================
 import { stage, layer } from './canvas.js';
-import { setCurrentCanvasWidth, setCurrentCanvasHeight, currentDevice, setCurrentDevice } from './state.js'; 
-import { syncNodeToLayout } from './elements.js';
+import { setCurrentCanvasWidth, setCurrentCanvasHeight, currentDevice, setCurrentDevice, selectedNodes } from './state.js';
+import { syncNodeToLayout, applySelectedNodes } from './elements.js';
 import { updateInspectorFromNode } from './inspector.js';
 
 // Webフォント(Google Fonts)の読込完了後にキャンバスを再描画してテキストへ反映
@@ -61,15 +61,24 @@ window.addEventListener('keydown', e => {
         && document.activeElement.tagName !== 'INPUT'
         && document.activeElement.tagName !== 'TEXTAREA') {
         e.preventDefault();
-        isSpaceDown = true;
-        canvasArea.style.cursor = 'grab';
+        if (!isSpaceDown) {   // 押しっぱなしの繰り返しkeydownでは1回だけ処理
+            isSpaceDown = true;
+            // グローバルフラグ: applySelectedNodes等がSpace中にdraggableを復活させないようガードする
+            window.__spaceDown = true;
+            canvasArea.style.cursor = 'grab';
+            // Space中はパン専用にし、オブジェクトを掴んで動かせないようにする
+            layer.find('.ui-element').forEach(n => n.draggable(false));
+        }
     }
 });
 
 window.addEventListener('keyup', e => {
     if (e.code !== 'Space') return;
     isSpaceDown = false;
+    window.__spaceDown = false;
     if (!isPanning) canvasArea.style.cursor = 'default';
+    // ドラッグ可否を選択状態から正しく再計算して元に戻す
+    applySelectedNodes(selectedNodes);
 });
 
 canvasArea.addEventListener('mousedown', e => {

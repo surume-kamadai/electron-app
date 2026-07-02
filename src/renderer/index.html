@@ -414,8 +414,34 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>太さ</label>
+                                <select id="ins-fontweight" onchange="onInspectorUpdate(true)">
+                                    <option value="normal">標準</option>
+                                    <option value="bold">太字</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>スタイル</label>
+                                <div style="display:flex; gap:10px; align-items:center; padding-top:4px;">
+                                    <label style="margin:0;"><input type="checkbox" id="ins-italic" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:3px;"><i>斜体</i></label>
+                                    <label style="margin:0;"><input type="checkbox" id="ins-underline" onchange="onInspectorUpdate(true)" style="width:auto; margin-right:3px;"><u>下線</u></label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>字間（px）</label>
+                                <input type="number" id="ins-letterspacing" value="0" step="0.5" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            </div>
+                            <div class="form-group">
+                                <label>行間（倍）</label>
+                                <input type="number" id="ins-lineheight" value="1.2" min="0.5" step="0.1" oninput="onInspectorUpdate(false)" onchange="onInspectorUpdate(true)">
+                            </div>
+                        </div>
                     </div>
-                    
+
                     <div class="form-group" id="group-btn-bgimage" style="display: none; margin-top: 10px;">
                         <label>ボタン背景画像</label>
                         <div class="row" style="align-items: center; margin-bottom: 5px;">

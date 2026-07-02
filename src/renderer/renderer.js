@@ -78,6 +78,16 @@ function strokeDecl(props, type) {
     return ` border: ${w}px solid ${c};`;
 }
 
+// テキストの 斜体/下線/字間/行間 のCSS（font-weight は各要素側で出力）
+function textExtraCss(props) {
+    let s = '';
+    if (props.italic) s += ' font-style: italic;';
+    if (props.underline) s += ' text-decoration: underline;';
+    const ls = parseFloat(props.letterSpacing); if (ls) s += ` letter-spacing: ${ls}px;`;
+    const lh = parseFloat(props.lineHeight); if (lh) s += ` line-height: ${lh};`;
+    return s;
+}
+
 // シーンデータ（1ページ分: canvas/bgColor/seo/elements）を受け取り、
 // 完成したHTML文字列を生成するエンジン。
 //   - sceneData: { canvas, bgColor, seo, elements, formAction? }
@@ -475,7 +485,7 @@ render() {
         // <button> はブラウザ既定で text-align:center になるため、揃え設定を明示する
         const align = escapeHtml(props.align || 'center');
         const btnR = Math.max(0, parseInt(props.cornerRadius ?? 8) || 0);
-        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: ${btnR}px; cursor: pointer; font-weight: bold; text-align: ${align}; ${shadowStyle}${strokeDecl(props, 'Button')}`;
+        const btnStyle = `width: 100%; height: 100%; box-sizing: border-box; ${bgStyle} color: ${color}; font-size: inherit; border: none; border-radius: ${btnR}px; cursor: pointer; font-weight: ${props.fontWeight || 'bold'}; text-align: ${align}; ${shadowStyle}${strokeDecl(props, 'Button')}${textExtraCss(props)}`;
         const formStyle = `margin: 0; position: absolute; width: 100%; height: 100%;`;
 
         // 送信ボタン: ページ全体を包む <form>（render側で出力）が送信を担うので
@@ -520,7 +530,7 @@ render() {
 
     // テキスト（見出し・本文）。単純な div として出力する。
     renderLabel(id, animClass, baseStyle, color, text, props, shadowStyle, indent) {
-        const style = `${baseStyle} display: block; overflow: hidden; ${shadowStyle}`;
+        const style = `${baseStyle} display: block; overflow: hidden; ${shadowStyle} font-weight: ${props.fontWeight || 'normal'};${textExtraCss(props)}`;
         return `${indent}<div id="${id}" class="${animClass}" style="${style}">${text}</div>\n`;
     }
 
