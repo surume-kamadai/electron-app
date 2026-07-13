@@ -226,3 +226,13 @@ electron-app/
         ├── ui/              ドックレイアウト・設定UI・トースト
         └── utils/           色などの共通ヘルパー
 ```
+
+## ライセンス
+
+本ソフトウェア（Site Builder 本体）は **PolyForm Noncommercial License 1.0.0** で提供されます。
+
+- **非商用目的に限り**利用・改変・再配布が可能です。
+- **いかなる商業利用も禁止**します。
+- 全文は [`LICENSE`](./LICENSE) を参照してください。
+
+なお、同梱・参照している各サードパーティ製ライブラリ（Konva / jQuery / Golden Layout / Pickr / Swiper / Google Fonts）には、それぞれのライセンス（MIT / SIL OFL）が引き続き適用されます。詳細は [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md) を参照してください。
