@@ -3,21 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- セキュリティ: スクリプトはローカル同梱(vendor/)のみ実行を許可し、外部からのコード読込を遮断。
+         フォントのみ Google Fonts を明示許可（表示用。実行コードではない）。 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'">
     <title>Site Builder</title>
-    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <!-- エディタ用ライブラリ（ローカル同梱: scripts/copy-vendor.mjs で node_modules から生成） -->
+    <script src="vendor/konva.min.js"></script>
     <!-- ドッキングUI: jQuery + golden-layout v1 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/golden-layout/1.5.9/css/goldenlayout-base.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/golden-layout/1.5.9/css/goldenlayout-dark-theme.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/golden-layout/1.5.9/goldenlayout.min.js"></script>
+    <script src="vendor/jquery.min.js"></script>
+    <link rel="stylesheet" href="vendor/goldenlayout-base.css" />
+    <link rel="stylesheet" href="vendor/goldenlayout-dark-theme.css" />
+    <script src="vendor/goldenlayout.min.js"></script>
     <link rel="stylesheet" href="editor.css">
-    <!-- 日本語Webフォント(Google Fonts) — エディタ表示用 -->
+    <!-- 日本語Webフォント(Google Fonts) — エディタ表示用（オフライン時はシステムフォントにフォールバック） -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Serif+JP:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;700&family=Kosugi+Maru&family=Sawarabi+Mincho&family=Zen+Maru+Gothic:wght@400;700&family=Yusei+Magic&family=Dela+Gothic+One&display=swap" rel="stylesheet">
     <!-- カラーピッカー(Pickr): 色相＋SV＋透明度(A)が一体のポップアップ -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/nano.min.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
+    <link rel="stylesheet" href="vendor/pickr-nano.min.css"/>
+    <script src="vendor/pickr.min.js"></script>
 </head>
 <body>
     <div class="workspace" id="workspace">

@@ -3,9 +3,20 @@
 // ウィンドウ生成 + ファイルシステム操作のIPC受け口
 // （PHPを使わず、ここでディスクへ直接書き込む）
 // ============================================================
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs/promises');
+
+// 出力先(baseDir)の外へ書き込ませないための安全なパス結合。
+// relPath に "../" 等が含まれ baseDir を抜け出す場合はエラーにする（パストラバーサル遮断）。
+function safeResolve(baseDir, relPath) {
+    const target = path.resolve(baseDir, relPath);
+    const rel = path.relative(baseDir, target);
+    if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+        throw new Error(`不正な出力パスです: ${relPath}`);
+    }
+    return target;
+}
 
 const isDev = process.argv.includes('--dev');
 
@@ -104,6 +115,19 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
     buildMenu();
 
+    // セキュリティ: 外部URLへの遷移・新規ウィンドウ生成を禁止する。
+    // 万一レンダラー内でリンク遷移が起きても、アプリのローカル画面が
+    // 差し替えられたり任意サイトを読み込んだりしないようにする。
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        // 外部リンクは既定ブラウザで開き、アプリ内には新規ウィンドウを作らない
+        if (/^https?:\/\//.test(url)) shell.openExternal(url);
+        return { action: 'deny' };
+    });
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        // ローカルファイル(file://)以外への遷移はブロック
+        if (!url.startsWith('file://')) event.preventDefault();
+    });
+
     if (isDev) {
         mainWindow.webContents.openDevTools();
     }
@@ -147,14 +171,14 @@ ipcMain.handle('export-project', async (event, payload) => {
     try {
         // テキストファイル群（HTMLやJSONなど）を書き出す
         for (const file of payload.files) {
-            const fullPath = path.join(baseDir, file.path);
+            const fullPath = safeResolve(baseDir, file.path);
             await fs.mkdir(path.dirname(fullPath), { recursive: true });
             await fs.writeFile(fullPath, file.content, 'utf-8');
         }
 
         // 画像の保存
         for (const img of payload.images || []) {
-            const fullPath = path.join(baseDir, img.path);
+            const fullPath = safeResolve(baseDir, img.path);
             await fs.mkdir(path.dirname(fullPath), { recursive: true });
             const base64 = img.dataUrl.replace(/^data:image\/\w+;base64,/, '');
             await fs.writeFile(fullPath, Buffer.from(base64, 'base64'));
