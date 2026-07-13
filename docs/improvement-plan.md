@@ -7,6 +7,12 @@ Site Builder（Electron版）の現状課題の改善と、新機能「CSSファ
 - 作成日: 2026-07-13
 - 前提: Node.js 22 / npm が使えること
 
+### 進捗
+
+- ✅ **Phase 1**: 実装済み（vitest導入・テスト実行可、デッドコード4件削除、README更新、electron-builder設定整備）
+- ✅ **Phase 5**: 実装済み（CSSファイル分離生成。`separateCss` 設定・静的/Laravel対応・テスト計24件通過）
+- ⬜ Phase 2 / 3 / 4: 未着手
+
 ---
 
 ## 現状サマリ
