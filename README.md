@@ -3,13 +3,6 @@
 GUIでWebサイトをデザインし、静的HTML または Laravel Blade を出力するデスクトップアプリです。
 PHPやNode.jsのサーバーは不要。アプリ単体で動作します。
 
-## 利用規約 / License
-
-本プロジェクトのソースコードおよびツールの利用は、非商用目的（個人の学習、研究、評価など）に限定されます。
-許可なく商用目的（業務での利用、販売、利益を得るサービスへの組み込み等）で利用・複製・再配布することは禁止されています。
-
-This project is strictly for **non-commercial use only** (e.g., personal learning, research, and evaluation). 
-Commercial use, reproduction, or redistribution for profit is strictly prohibited without permission.
 ## 開発時の起動
 
 ```bash
