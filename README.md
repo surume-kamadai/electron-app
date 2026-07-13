@@ -6,8 +6,8 @@ PHPやNode.jsのサーバーは不要。アプリ単体で動作します。
 ## 開発時の起動
 
 ```bash
-cd electron-app
-npm install      # 初回のみ（electron をダウンロード）
+cd WebSitebuilder-Laravel
+npm install      # 初回のみ（electron のDL＋同梱ライブラリの配置）
 npm start        # アプリ起動
 npm run dev      # 開発者ツール付きで起動
 ```
@@ -204,7 +204,7 @@ npm run test:watch
 ## 構成
 
 ```
-electron-app/
+WebSitebuilder-Laravel/
 ├── package.json
 └── src/
     ├── main/
