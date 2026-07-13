@@ -1,138 +1,79 @@
-# PolyForm Noncommercial License 1.0.0
+Site Builder ライセンス（非商用配布ライセンス / Non-Commercial-Distribution License）
+Copyright (c) 2026 surume-kamadai
 
-<https://polyformproject.org/licenses/noncommercial/1.0.0>
+本ライセンスは、本ソフトウェアの「利用」は商用を含めて広く認めつつ、
+本ソフトウェア自体の「商用配布（販売等）」のみを禁止するものです。
 
-Required Notice: Copyright (c) 2026 surume-kamadai
+--------------------------------------------------------------------
+1. 定義
+--------------------------------------------------------------------
+1.1 「本ソフトウェア」とは、Site Builder 本体（ソースコード、および
+    それをビルドした実行ファイル・配布物の一切）を指します。同梱される
+    サードパーティ製ライブラリは含みません（第5条参照）。
+1.2 「生成物」とは、利用者が本ソフトウェアを用いて作成した Web サイト、
+    HTML/CSS、Blade テンプレート等の出力物を指します。
+1.3 「商用配布」とは、本ソフトウェア（原本・改変版・その一部を問わない）
+    それ自体を、対価を得て販売・頒布・ライセンス供与すること、または
+    有償の製品・サービスの一部として提供・再頒布することを指します。
 
-> このソフトウェア（Site Builder）は「非商用目的」に限り利用・改変・再配布できます。
-> いかなる商業利用も許可されません。詳細は以下の条文（正文）を参照してください。
-> 同梱の各サードパーティ製ライブラリは、それぞれのライセンス（MIT 等）が適用されます。
-> 詳しくは THIRD-PARTY-NOTICES.md を参照してください。
+--------------------------------------------------------------------
+2. 許諾（無償・非独占）
+--------------------------------------------------------------------
+本ライセンスの条件に従うことを条件として、著作権者は何人に対しても
+無償・非独占で以下を許諾します。
+2.1 目的を問わず（商用・業務利用を含む）本ソフトウェアを使用すること。
+2.2 本ソフトウェアを用いて生成物を作成し、生成物を商用を含め自由に
+    利用・公開・販売すること。生成物に対して本ライセンスは一切の
+    制限を課しません（生成物は利用者に帰属します）。
+2.3 本ソフトウェアを私的または組織内で複製・改変し、改変版を私的または
+    組織内で使用すること。
+2.4 第4条の禁止に該当しない範囲で、本ソフトウェア（改変版を含む）を
+    無償で再配布すること。ただし本ライセンス全文と上記著作権表示を
+    添付し、かつ第5条のサードパーティ表記を保持することを条件とします。
 
-## Acceptance
+--------------------------------------------------------------------
+3. 生成物の扱い
+--------------------------------------------------------------------
+生成物の権利は利用者に帰属し、その商用利用・販売・再配布に本ライセンスは
+一切関与しません。ただし生成物が参照・同梱するサードパーティ製リソース
+（例: Swiper、Google Fonts 等）には、それぞれのライセンスが適用されます。
 
-In order to get any license under these terms, you must agree
-to them as both strict obligations and conditions to all
-your licenses.
+--------------------------------------------------------------------
+4. 禁止事項
+--------------------------------------------------------------------
+4.1 本ソフトウェアの商用配布（第1.3条）を禁止します。
+4.2 本ソフトウェアを有償の製品・サービス（有償SaaSを含む）の一部として
+    再頒布・再ライセンス供与することを禁止します。
+4.3 本ライセンスまたは著作権表示を除去・改変して配布することを禁止します。
 
-## Copyright License
+--------------------------------------------------------------------
+5. サードパーティ製ソフトウェア
+--------------------------------------------------------------------
+本ソフトウェアに同梱・参照されるサードパーティ製ライブラリ
+（Konva、jQuery、Golden Layout、Pickr、Swiper、Google Fonts 等）には、
+本ライセンスではなく、それぞれのライセンス（MIT / SIL OFL 等）が適用され、
+それらは商用利用も可能です。詳細は THIRD-PARTY-NOTICES.md を参照してください。
 
-The licensor grants you a copyright license for the
-software to do everything you might do with the software
-that would otherwise infringe the licensor's copyright
-in it for any permitted purpose.  However, you may
-only distribute the software according to [Distribution
-License](#distribution-license) and make changes or new works
-based on the software according to [Changes and New Works
-License](#changes-and-new-works-license).
+--------------------------------------------------------------------
+6. 無保証・免責
+--------------------------------------------------------------------
+本ソフトウェアは「現状有姿」で提供され、明示黙示を問わずいかなる保証も
+ありません。著作権者は、本ソフトウェアの使用または使用不能から生じる
+いかなる損害についても、法が許す最大限の範囲で責任を負いません。
 
-## Distribution License
+--------------------------------------------------------------------
+7. 違反
+--------------------------------------------------------------------
+本ライセンスに違反した場合、その違反者に対する本ライセンスに基づく許諾は
+自動的に終了します。
 
-The licensor grants you an additional copyright license
-to distribute copies of the software.  Your license
-to distribute covers distributing the software with
-changes and new works permitted by [Changes and New Works
-License](#changes-and-new-works-license).
-
-## Notices
-
-You must ensure that anyone who gets a copy of any part of
-the software from you also gets a copy of these terms or the
-URL for them above, as well as copies of any plain-text lines
-beginning with `Required Notice:` that the licensor provided
-with the software.  For example:
-
-> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
-
-## Changes and New Works License
-
-The licensor grants you an additional copyright license to
-make changes and new works based on the software for any
-permitted purpose.
-
-## Patent License
-
-The licensor grants you a patent license for the software that
-covers patent claims the licensor can license, or becomes able
-to license, that you would infringe by using the software.
-
-## Noncommercial Purposes
-
-Any noncommercial purpose is a permitted purpose.
-
-## Personal Uses
-
-Personal use for research, experiment, and testing for
-the benefit of public knowledge, personal study, private
-entertainment, hobby projects, amateur pursuits, or religious
-observance, without any anticipated commercial application,
-is use for a permitted purpose.
-
-## Noncommercial Organizations
-
-Use by any charitable organization, educational institution,
-public research organization, public safety or health
-organization, environmental protection organization,
-or government institution is use for a permitted purpose
-regardless of the source of funding or obligations resulting
-from the funding.
-
-## Fair Use
-
-You may have "fair use" rights for the software under the
-law. These terms do not limit them.
-
-## No Other Rights
-
-These terms do not allow you to sublicense or transfer any of
-your licenses to anyone else, or prevent the licensor from
-granting licenses to anyone else.  These terms do not imply
-any other licenses.
-
-## Patent Defense
-
-If you make any written claim that the software infringes or
-contributes to infringement of any patent, your patent license
-for the software granted under these terms ends immediately. If
-your company makes such a claim, your patent license ends
-immediately for work on behalf of your company.
-
-## Violations
-
-The first time you are notified in writing that you have
-violated any of these terms, or done anything with the software
-not covered by your licenses, your licenses can nonetheless
-continue if you come into full compliance with these terms,
-and take practical steps to correct past violations, within
-32 days of receiving notice.  Otherwise, all your licenses
-end immediately.
-
-## No Liability
-
-***As far as the law allows, the software comes as is, without
-any warranty or condition, and the licensor will not be liable
-to you for any damages arising out of these terms or the use
-or nature of the software, under any kind of legal claim.***
-
-## Definitions
-
-The **licensor** is the individual or entity offering these
-terms, and the **software** is the software the licensor makes
-available under these terms.
-
-**You** refers to the individual or entity agreeing to these
-terms.
-
-**Your company** is any legal entity, sole proprietorship,
-or other kind of organization that you work for, plus all
-organizations that have control over, are under the control of,
-or are under common control with that organization.  **Control**
-means ownership of substantially all the assets of an entity,
-or the power to direct its management and policies by vote,
-contract, or otherwise.  Control can be direct or indirect.
-
-**Your licenses** are all the licenses granted to you for the
-software under these terms.
-
-**Use** means anything you do with the software requiring one
-of your licenses.
+--------------------------------------------------------------------
+English summary (non-binding; the Japanese text above governs)
+--------------------------------------------------------------------
+You may use this software for ANY purpose, including commercial and
+business use, and you may freely use, publish, and sell the websites and
+other output you create with it. You may copy, modify, and redistribute the
+software for free as long as this license and the copyright notice are kept.
+You may NOT sell or commercially distribute the software itself, nor include
+it in a paid product or service. Bundled third-party libraries remain under
+their own licenses (MIT / OFL); see THIRD-PARTY-NOTICES.md.

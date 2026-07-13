@@ -229,10 +229,10 @@ electron-app/
 
 ## ライセンス
 
-本ソフトウェア（Site Builder 本体）は **PolyForm Noncommercial License 1.0.0** で提供されます。
+本ソフトウェア（Site Builder 本体）は **独自ライセンス（非商用配布ライセンス）** で提供されます。全文は [`LICENSE`](./LICENSE) を参照してください。
 
-- **非商用目的に限り**利用・改変・再配布が可能です。
-- **いかなる商業利用も禁止**します。
-- 全文は [`LICENSE`](./LICENSE) を参照してください。
+- ✅ **利用は自由**（商用・業務利用を含む）。本アプリで作った Web サイト等の**生成物は制限なく商用利用・販売**できます。
+- ✅ 私的・組織内での**改変**、および本ライセンスと著作権表示を保持した上での**無償の再配布**が可能。
+- ❌ **本アプリ自体の商用配布（販売・有償頒布、有償製品/サービスへの組み込み）は禁止**します。
 
-なお、同梱・参照している各サードパーティ製ライブラリ（Konva / jQuery / Golden Layout / Pickr / Swiper / Google Fonts）には、それぞれのライセンス（MIT / SIL OFL）が引き続き適用されます。詳細は [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md) を参照してください。
+なお、同梱・参照している各サードパーティ製ライブラリ（Konva / jQuery / Golden Layout / Pickr / Swiper / Google Fonts）には、それぞれのライセンス（MIT / SIL OFL）が引き続き適用され、商用利用も可能です。詳細は [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md) を参照してください。
