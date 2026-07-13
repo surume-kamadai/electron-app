@@ -6,8 +6,8 @@ PHPやNode.jsのサーバーは不要。アプリ単体で動作します。
 ## 開発時の起動
 
 ```bash
-cd electron-app
-npm install      # 初回のみ（electron をダウンロード）
+cd WebSitebuilder-Laravel
+npm install      # 初回のみ（electron のDL＋同梱ライブラリの配置）
 npm start        # アプリ起動
 npm run dev      # 開発者ツール付きで起動
 ```
@@ -204,7 +204,7 @@ npm run test:watch
 ## 構成
 
 ```
-electron-app/
+WebSitebuilder-Laravel/
 ├── package.json
 └── src/
     ├── main/
@@ -224,5 +224,15 @@ electron-app/
         ├── export/          HTML/CSS生成エンジン（static/blade両対応）
         ├── preview/         プレビュー
         ├── ui/              ドックレイアウト・設定UI・トースト
-        └── utils/           色などの共通ヘルパー
+        └── vendor/          同梱ライブラリ（Konva/jQuery/GoldenLayout/Pickr）
 ```
+
+## ライセンス
+
+本ソフトウェア（Site Builder 本体）は **独自ライセンス（非商用配布ライセンス）** で提供されます。全文は [`LICENSE`](./LICENSE) を参照してください。
+
+- ✅ **利用は自由**（商用・業務利用を含む）。本アプリで作った Web サイト等の**生成物は制限なく商用利用・販売**できます。
+- ✅ 私的・組織内での**改変**、および本ライセンスと著作権表示を保持した上での**無償の再配布**が可能。
+- ❌ **本アプリ自体の商用配布（販売・有償頒布、有償製品/サービスへの組み込み）は禁止**します。
+
+なお、同梱・参照している各サードパーティ製ライブラリ（Konva / jQuery / Golden Layout / Pickr / Swiper / Google Fonts）には、それぞれのライセンス（MIT / SIL OFL）が引き続き適用され、商用利用も可能です。詳細は [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md) を参照してください。
