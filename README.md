@@ -53,6 +53,13 @@ GAS（フォーム送信トリガー）
 担当者へ自動メール（件名に氏名を差し込み）
 ```
 
+## 開発・テスト
+
+```bash
+npm test         # 出力エンジンのユニットテスト（vitest）
+npm run test:watch
+```
+
 ## 構成
 
 ```
@@ -65,8 +72,16 @@ electron-app/
     └── renderer/
         ├── index.html       エディタ画面
         ├── editor.css       スタイル
-        ├── main-renderer.js エントリーポイント
-        ├── renderer.js      HTML生成エンジン（static/blade両対応）
-        ├── exporter.js      プロジェクト組み立て
-        └── editor/          エディタ機能11モジュール
+        ├── app/             エントリーポイント・共有ステート
+        ├── canvas/          Konvaキャンバス・ルーラー・オーバーレイ
+        ├── nodes/           要素定義・スタイル・変換
+        ├── inspector/       プロパティパネル各種エディタ
+        ├── interaction/     イベント・クリップボード・テキスト編集
+        ├── history/         Undo/Redo（ページ単位）
+        ├── explorer/        レイヤー/ページ一覧UI
+        ├── project/         プロジェクト・ページ管理・出力API
+        ├── export/          HTML/CSS生成エンジン（static/blade両対応）
+        ├── preview/         プレビュー
+        ├── ui/              ドックレイアウト・設定UI・トースト
+        └── utils/           色などの共通ヘルパー
 ```
