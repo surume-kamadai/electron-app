@@ -224,7 +224,7 @@ electron-app/
         ├── export/          HTML/CSS生成エンジン（static/blade両対応）
         ├── preview/         プレビュー
         ├── ui/              ドックレイアウト・設定UI・トースト
-        └── utils/           色などの共通ヘルパー
+        └── vendor/          同梱ライブラリ（Konva/jQuery/GoldenLayout/Pickr）
 ```
 
 ## ライセンス
