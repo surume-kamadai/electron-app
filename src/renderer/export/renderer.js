@@ -21,6 +21,11 @@ export class HtmlRenderer {
         this.mode     = options.mode || 'static';
         this.imageMap = options.imageMap || new Map();
 
+        // CSS分離モード: 指定時は <style> を埋め込まず外部CSSを <link> 参照する。
+        // 例: ['css/common.css', 'css/index.css']（Bladeは {{ asset('css/...') }} 形式）
+        this.cssHrefs     = options.cssHrefs || null;
+        this.extractedCss = null;  // 分離モード時、ページ固有CSSの全文をここへ保持する
+
         // レスポンシブ用CSS と 動的JS を描画中に溜めて、最後に <head>/<script> へ出力する
         this.dynamicCss = [];
         this.dynamicJs  = [];
@@ -85,9 +90,20 @@ render() {
             html += `    <link href="https://fonts.googleapis.com/css2?${fams}&display=swap" rel="stylesheet">\n`;
         }
 
-        html += '    <style>\n' + ANIM_CSS + '\n    </style>\n';
-        html += '    <style id="dynamic-styles">\n    ' + cssString + '\n    </style>\n';
-        
+        if (this.cssHrefs) {
+            // 分離モード: 外部CSSを <link> 参照する。ページ固有CSSは extractedCss に保持し、
+            // 共通のアニメーションCSS(ANIM_CSS)は exporter が common.css として出力する。
+            // href は Blade の {{ asset('...') }} を壊さないよう escapeHtml せず、
+            // 属性を破壊しうる二重引用符だけを無害化する。
+            for (const href of this.cssHrefs) {
+                html += `    <link rel="stylesheet" href="${String(href).replace(/"/g, '&quot;')}">\n`;
+            }
+            this.extractedCss = cssString;
+        } else {
+            html += '    <style>\n' + ANIM_CSS + '\n    </style>\n';
+            html += '    <style id="dynamic-styles">\n    ' + cssString + '\n    </style>\n';
+        }
+
         // ▼▼ 追加: スライダーがあればSwiperのCSSを読み込む ▼▼
         if (elementsHtml.includes('class="swiper')) {
             html += '    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />\n';
@@ -144,6 +160,10 @@ render() {
 
         return html;
     }
+
+    // 分離モード時、ページ固有CSS（.site-canvas と .el-xxx ルール群）の全文を返す。
+    // render() を呼んだ後に使う。従来（埋め込み）モードでは null。
+    getExtractedCss() { return this.extractedCss; }
 
     // 要素ツリーを再帰的にたどり、最初の「送信ボタン」(role==='submit')の
     // プロパティを返す。無ければ null。

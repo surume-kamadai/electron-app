@@ -96,3 +96,46 @@ describe('HtmlRenderer フォーム', () => {
         expect(h).not.toContain('<form');
     });
 });
+
+describe('HtmlRenderer CSS分離', () => {
+    const labelScene = base({ elements: [
+        { id: 'lb1', type: 'Label', transform: { x: 10, y: 20, width: 100, height: 30 }, properties: { text: 'hi' } },
+    ] });
+
+    it('cssHrefs 未指定なら従来どおり <style> 埋め込みで出力する', () => {
+        const h = render(labelScene);
+        expect(h).toContain('<style id="dynamic-styles">');
+        expect(h).not.toContain('<link rel="stylesheet" href="css/');
+    });
+
+    it('cssHrefs 指定時は <link> 参照になり <style id="dynamic-styles"> を出さない', () => {
+        const r = new HtmlRenderer(labelScene,
+            { mode: 'static', imageMap: new Map(), cssHrefs: ['css/common.css', 'css/index.css'] });
+        const h = r.render();
+        expect(h).toContain('<link rel="stylesheet" href="css/common.css">');
+        expect(h).toContain('<link rel="stylesheet" href="css/index.css">');
+        expect(h).not.toContain('<style id="dynamic-styles">');
+    });
+
+    it('getExtractedCss() に .site-canvas と .el-<id> ルールを含む', () => {
+        const r = new HtmlRenderer(labelScene,
+            { mode: 'static', imageMap: new Map(), cssHrefs: ['css/index.css'] });
+        r.render();
+        const css = r.getExtractedCss();
+        expect(css).toContain('.site-canvas {');
+        expect(css).toContain('.el-lb1 {');
+    });
+
+    it('従来モードでは getExtractedCss() は null', () => {
+        const r = new HtmlRenderer(labelScene, { mode: 'static', imageMap: new Map() });
+        r.render();
+        expect(r.getExtractedCss()).toBeNull();
+    });
+
+    it('Blade の {{ asset() }} 形式の href をエスケープせずそのまま出す', () => {
+        const r = new HtmlRenderer(labelScene,
+            { mode: 'blade', imageMap: new Map(), cssHrefs: ["{{ asset('css/common.css') }}"] });
+        const h = r.render();
+        expect(h).toContain(`href="{{ asset('css/common.css') }}"`);
+    });
+});

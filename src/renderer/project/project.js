@@ -29,6 +29,7 @@ function createEmptyProject() {
             projectName: 'my-site',
             canvas: { width: 800, height: 600, mobileWidth: 375, mobileHeight: 800 },
             outputType: 'static',   // 'static' | 'laravel'
+            separateCss: false,     // true: CSSを css/ フォルダへ分離出力（既定は埋め込み）
             siteBgColor: '#f1f2f6', // サイト全体のデフォルト背景色
             // サイト共通のSEO初期値（各ページが未指定ならこれを使う）
             seo: { siteName: '', lang: 'ja', description: '', ogImage: '' },
@@ -222,6 +223,11 @@ export function loadProject(jsonStr) {
     // 後方互換: 背景色設定が無ければ補う
     if (project.settings && project.settings.siteBgColor === undefined) {
         project.settings.siteBgColor = '#f1f2f6';
+    }
+
+    // 後方互換: CSS分離設定が無ければ埋め込み(false)にする
+    if (project.settings && project.settings.separateCss === undefined) {
+        project.settings.separateCss = false;
     }
     (project.pages || []).forEach(p => {
         if (p.bgColor === undefined) p.bgColor = '';

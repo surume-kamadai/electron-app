@@ -6,24 +6,28 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac"
   },
-  "author": "",
+  "author": "surume-kamadai",
   "license": "MIT",
   "devDependencies": {
     "electron": "^31.0.0",
-    "electron-builder": "^24.13.0"
+    "electron-builder": "^24.13.0",
+    "vitest": "^4.1.10"
   },
   "build": {
-    "appId": "com.example.site-builder",
+    "appId": "com.surumekamadai.sitebuilder",
     "productName": "Site Builder",
     "directories": {
       "output": "dist"
     },
     "files": [
       "src/**/*",
+      "!src/**/*.test.js",
       "node_modules/**/*"
     ],
     "win": {
