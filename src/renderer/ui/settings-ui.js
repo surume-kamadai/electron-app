@@ -127,6 +127,12 @@ export function onOutputTypeChange() {
     if (el) updateSettings({ outputType: el.value });
 }
 
+// CSSを別ファイルに出力するか（分離出力）の変更
+export function updateSeparateCss() {
+    const el = document.getElementById('separate-css');
+    if (el) updateSettings({ separateCss: el.checked });
+}
+
 // キャンバスサイズ変更時に設定へ同期（display.js の updateCanvasSize も呼ぶ）
 export function onCanvasSizeChange() {
     updateCanvasSize();   // 見た目を更新
@@ -144,6 +150,8 @@ export function initSettingsUI() {
     const ot = document.getElementById('output-type');
     if (pn) pn.value = s.projectName;
     if (ot) ot.value = s.outputType;
+    const sc = document.getElementById('separate-css');
+    if (sc) sc.checked = !!s.separateCss;
     document.getElementById('canvas-width').value  = s.canvas.width;
     document.getElementById('canvas-height').value = s.canvas.height;
     const mw = document.getElementById('canvas-mobile-width');

@@ -6,6 +6,7 @@
 //   'laravel' : Laravelプロジェクト構造（Blade + routes + public/images）
 // ============================================================
 import { HtmlRenderer } from './renderer.js';
+import { ANIM_CSS } from './css-generator.js';
 
 // ページ＋サイト設定からSEOメタ情報を解決する
 // （ページ個別が空ならサイト共通値にフォールバック）
@@ -73,12 +74,29 @@ function collectImages(project) {
 export function buildStaticProject(project, projectName = 'my-site') {
     const { imageMap, images } = collectImages(project);
     const folderMap = new Map((project.folders || []).map(f => [f.id, f.name]));
-    
+    const separateCss = !!project.settings?.separateCss;
+
     const files = [
         { path: 'README.txt', content: staticReadme() },
     ];
+    if (separateCss) {
+        // 全ページ共通のアニメーションCSS
+        files.push({ path: 'css/common.css', content: ANIM_CSS });
+    }
 
     for (const page of (project.pages || [])) {
+        // フォルダ名があれば付与
+        const folderName = folderMap.get(page.folderId);
+
+        // 分離モード: フォルダ内ページは名前衝突を避けるためプレフィックスを付け、
+        // HTMLからは1つ上の css/ を相対参照する。
+        let cssHrefs = null, cssFileName = null;
+        if (separateCss) {
+            cssFileName = folderName ? `${folderName}_${page.name}.css` : `${page.name}.css`;
+            const prefix = folderName ? '../' : '';
+            cssHrefs = [`${prefix}css/common.css`, `${prefix}css/${cssFileName}`];
+        }
+
         // HtmlRenderer に渡すための単一ページ用ダミーシーンを構築
         const bgColor = page.bgColor || project.settings?.siteBgColor || '#f1f2f6';
         const sceneData = {
@@ -87,14 +105,15 @@ export function buildStaticProject(project, projectName = 'my-site') {
             elements: page.elements || [],
             seo: resolveSeo(project, page),
         };
-        const renderer = new HtmlRenderer(sceneData, { mode: 'static', imageMap });
+        const renderer = new HtmlRenderer(sceneData, { mode: 'static', imageMap, cssHrefs });
         const html = renderer.render();
 
-        // フォルダ名があれば付与
-        const folderName = folderMap.get(page.folderId);
         const filePath = folderName ? `${folderName}/${page.name}.html` : `${page.name}.html`;
-
         files.push({ path: filePath, content: html });
+
+        if (separateCss) {
+            files.push({ path: `css/${cssFileName}`, content: renderer.getExtractedCss() });
+        }
     }
 
     return {
@@ -115,9 +134,13 @@ export function buildLaravelProject(project, projectName = 'my-laravel-site') {
     }
 
     const folderMap = new Map((project.folders || []).map(f => [f.id, f.name]));
+    const separateCss = !!project.settings?.separateCss;
     const files = [
         { path: 'README.txt', content: laravelReadme() },
     ];
+    if (separateCss) {
+        files.push({ path: 'public/css/common.css', content: ANIM_CSS });
+    }
     const routes = [];
     const postRoutes = [];   // フォーム送信用 POST ルート
 
@@ -126,6 +149,16 @@ export function buildLaravelProject(project, projectName = 'my-laravel-site') {
 
         const folderName = folderMap.get(page.folderId);
         const viewPathName = folderName ? `${folderName}/${page.name}` : page.name;
+
+        // 分離モード: ビューパスの / を _ に置換してCSSファイル名の衝突を避ける
+        let cssHrefs = null, cssFileName = null;
+        if (separateCss) {
+            cssFileName = `${viewPathName.replace(/\//g, '_')}.css`;
+            cssHrefs = [
+                `{{ asset('css/common.css') }}`,
+                `{{ asset('css/${cssFileName}') }}`,
+            ];
+        }
 
         // 送信ボタンがあれば、このページのフォーム action（POSTルート）を決める
         const submit = findSubmitButton(page.elements || []);
@@ -143,7 +176,7 @@ export function buildLaravelProject(project, projectName = 'my-laravel-site') {
             seo: resolveSeo(project, page),
             formAction,
         };
-        const renderer = new HtmlRenderer(sceneData, { mode: 'blade', imageMap: laravelImageMap });
+        const renderer = new HtmlRenderer(sceneData, { mode: 'blade', imageMap: laravelImageMap, cssHrefs });
         const blade = renderer.render();
 
         // Bladeファイルの出力パス
@@ -151,6 +184,10 @@ export function buildLaravelProject(project, projectName = 'my-laravel-site') {
             path: `resources/views/${viewPathName}.blade.php`,
             content: blade
         });
+
+        if (separateCss) {
+            files.push({ path: `public/css/${cssFileName}`, content: renderer.getExtractedCss() });
+        }
 
         // route用のパス定義 (indexの場合は / にする)
         const urlPath = viewPathName === 'index' ? '/' : `/${viewPathName}`;

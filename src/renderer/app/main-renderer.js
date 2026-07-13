@@ -25,7 +25,7 @@ import { initEffectOverlay } from '../canvas/effect-overlay.js';
 import { initColorPickers } from '../inspector/color-picker.js';
 import { initLayerStyleDialog } from '../inspector/layer-style.js';
 import {
-    onProjectNameChange, onOutputTypeChange,
+    onProjectNameChange, onOutputTypeChange, updateSeparateCss,
     onCanvasSizeChange, initSettingsUI,
     updateSiteBgColor, updatePageBgColor, clearPageBgColor, syncBgColorUI,
     updateSiteSeo, updatePageSeo,
@@ -58,6 +58,7 @@ window.distributeNodes    = distributeNodes;
 // --- プロジェクト設定 ---
 window.onProjectNameChange = onProjectNameChange;
 window.onOutputTypeChange  = onOutputTypeChange;
+window.updateSeparateCss   = updateSeparateCss;
 window.updateSiteBgColor   = updateSiteBgColor;
 window.updatePageBgColor   = updatePageBgColor;
 window.clearPageBgColor    = clearPageBgColor;
