@@ -86,7 +86,7 @@ const foldered = (separateCss = true) => project({
 });
 
 describe('buildStaticProject CSS分離', () => {
-    it('separateCss:false（既定）では css/ ファイルを一切出さず、HTMLに埋め込む', () => {
+    it('separateCss:false を明示すると css/ ファイルを一切出さず、HTMLに埋め込む', () => {
         const out = buildStaticProject(project());
         expect(out.files.some(f => f.path.startsWith('css/'))).toBe(false);
         const idx = out.files.find(f => f.path === 'index.html');
