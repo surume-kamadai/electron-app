@@ -1,6 +1,8 @@
 // ============================================================
 // components.js - テンプレート部品（Hero/Card/FAQ/Slider/ArticleGrid/Accordion）の生成
+// components.js - creates template parts (Hero/Card/FAQ/Slider/ArticleGrid/Accordion).
 // spawnComponent は elements.js の spawnElement を組み合わせて定形レイアウトを作る。
+// spawnComponent combines elements.js's spawnElement to build a preset layout.
 // ============================================================
 import { layer } from '../canvas/canvas.js';
 import { saveHistory } from '../history/history.js';
@@ -54,8 +56,8 @@ export function spawnComponent(componentName) {
                 bgcolor: '#2d3436', 
                 shadow: 'light', 
                 animation: 'fadein',
-                // カンマ区切りで初期画像を3枚設定
-                text: 'https://placehold.co/600x350/png?text=Slide+1,https://placehold.co/600x350/png?text=Slide+2,https://placehold.co/600x350/png?text=Slide+3' 
+                // カンマ区切りで初期画像を3枚設定 / Three initial images, comma-separated.
+                text: 'https://placehold.co/600x350/png?text=Slide+1,https://placehold.co/600x350/png?text=Slide+2,https://placehold.co/600x350/png?text=Slide+3'
             }
         };
     } else if (componentName === 'ArticleGrid') {
@@ -106,6 +108,7 @@ export function spawnComponent(componentName) {
 
     if (!data) return;
 
+    // 生成データの各ノードにユニークIDを振る / Assign a unique id to every node in the data.
     const nextNum = makeTypeCounter();
     function assignIds(nodeData) {
         nodeData.id = nodeData.type.toLowerCase() + '_' + nextNum(nodeData.type);
@@ -116,6 +119,7 @@ export function spawnComponent(componentName) {
     assignIds(data);
 
     // data.type に応じて正しい要素を生成（Sliderの場合もある）
+    // Spawn the right element based on data.type (which may be a Slider, etc.).
     const node = spawnElement(data.type, data, layer, false, true);
 
     layer.batchDraw();
