@@ -1,12 +1,18 @@
 // ============================================================
 // render-components.js - 動的部品（スライダー/記事グリッド/アコーディオン）のHTML生成
+// render-components.js - HTML generation for dynamic parts (slider / article grid / accordion).
 // HtmlRenderer から分離。第1引数 r に renderer インスタンスを受け取り、
 // r.dynamicJs / r.dynamicCss / r.imageMap を通じて初期化JS・CSS・画像解決を行う。
+// Split out of HtmlRenderer. Takes the renderer instance as the first arg (r) and uses
+// r.dynamicJs / r.dynamicCss / r.imageMap for init JS, CSS, and image resolution.
 // ============================================================
 import { escapeHtml, resolveImageSrc } from './css-generator.js';
 
+// 画像スライダー（Swiper.js）。slides[] からマークアップを作り初期化JSを積む。
+// Image slider (Swiper.js). Builds markup from slides[] and pushes its init JS.
 export function renderSlider(r, id, animClass, baseStyle, props, indent) {
         // 新スキーマ slides[] 優先、無ければ旧 text(カンマ区切り画像URL)から変換
+        // Prefer the new slides[] schema; otherwise convert from legacy text (comma-separated image URLs).
         let slides = props.slider?.slides;
         if (!Array.isArray(slides) || slides.length === 0) {
             const legacy = (props.text || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -34,6 +40,7 @@ export function renderSlider(r, id, animClass, baseStyle, props, indent) {
         const useFade  = effect === 'fade';
 
         // Swiperのエフェクト名（grid は slide扱い + slidesPerView複数）
+        // Swiper effect name (grid is treated as 'slide' with multiple slidesPerView).
         const swiperEffect = useGrid ? 'slide' : effect;
 
         let out = `${indent}<div id="${id}" class="swiper ${animClass}" style="${baseStyle} border-radius: 5px; overflow:hidden;">\n`;
@@ -45,7 +52,7 @@ export function renderSlider(r, id, animClass, baseStyle, props, indent) {
             const text  = escapeHtml(sl.text  || '');
             const hasOverlay = !!(sl.title || sl.text);
 
-            // リンク種別
+            // リンク種別 / Link kind (external URL / internal page / none)
             let openTag = '', closeTag = '';
             if (sl.linkType === 'url' && sl.link) {
                 const url = escapeHtml(sl.link);
@@ -80,7 +87,7 @@ export function renderSlider(r, id, animClass, baseStyle, props, indent) {
         }
         out += `${indent}</div>\n`;
 
-        // Swiper初期化JS
+        // Swiper初期化JS / Swiper init JS
         const opts = [];
         opts.push(`speed: ${speed}`);
         opts.push(`loop: ${loop}`);
@@ -110,7 +117,9 @@ export function renderSlider(r, id, animClass, baseStyle, props, indent) {
     }
 
     // 記事グリッド。CSSグリッドでカードを並べる。sliderMode の場合は Swiper で横スクロール。
+    // Article grid. Lays cards out with CSS grid; sliderMode uses Swiper for horizontal scroll.
     // 768px以下は1カラムに自動で折り返す（レスポンシブ）。
+    // Collapses to a single column at 768px and below (responsive).
 export function renderArticleGrid(r, id, animClass, baseStyle, props, indent) {
         const g = props.grid || {};
         const items      = Array.isArray(g.items) ? g.items : [];
@@ -126,7 +135,7 @@ export function renderArticleGrid(r, id, animClass, baseStyle, props, indent) {
             return `${indent}<div id="${id}" style="${baseStyle} background:#f1f2f6; color:#666; display:flex; align-items:center; justify-content:center;">アイテムが設定されていません</div>\n`;
         }
 
-        // 1枚のカードHTMLを生成する共通関数
+        // 1枚のカードHTMLを生成する共通関数 / Shared helper that builds one card's HTML.
         const buildCard = (it) => {
             const img   = it.image ? escapeHtml(resolveImageSrc(it.image, r.imageMap)) : '';
             const title = escapeHtml(it.title || '');
@@ -162,13 +171,14 @@ export function renderArticleGrid(r, id, animClass, baseStyle, props, indent) {
             return c;
         };
 
-        // ホバー効果は共通
+        // ホバー効果は共通 / Hover effect is shared by both modes.
         r.dynamicCss.push(
             `#${id} .article-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }`
         );
 
         if (sliderMode) {
             // ===== スライダーモード（Swiperで横スクロール）=====
+            // ===== Slider mode (horizontal scroll via Swiper) =====
             const autoplay   = g.autoplay ?? false;
             const delay      = g.delay ?? 3000;
             const loop       = g.loop ?? true;
@@ -192,7 +202,7 @@ export function renderArticleGrid(r, id, animClass, baseStyle, props, indent) {
             opts.push(`loop: ${loop}`);
             if (autoplay) opts.push(`autoplay: { delay: ${delay}, disableOnInteraction: false }`);
             if (navigation) opts.push(`navigation: { nextEl: '#${id} .swiper-button-next', prevEl: '#${id} .swiper-button-prev' }`);
-            // レスポンシブ: 狭い画面では表示枚数を減らす
+            // レスポンシブ: 狭い画面では表示枚数を減らす / Responsive: show fewer slides on narrow screens.
             opts.push(`breakpoints: { 0: { slidesPerView: 1 }, 600: { slidesPerView: ${Math.min(2, columns)} }, 900: { slidesPerView: ${columns} } }`);
 
             r.dynamicJs.push(`
@@ -205,7 +215,7 @@ export function renderArticleGrid(r, id, animClass, baseStyle, props, indent) {
             return out;
         }
 
-        // ===== 通常グリッドモード =====
+        // ===== 通常グリッドモード / Normal grid mode =====
         const containerStyle = `${baseStyle} display: grid; grid-template-columns: repeat(${columns}, 1fr); gap: ${gap}px; padding: 0; box-sizing: border-box; align-items: start;`;
         let out = `${indent}<div id="${id}" class="${animClass}" style="${containerStyle}">\n`;
         items.forEach(it => {
@@ -213,7 +223,7 @@ export function renderArticleGrid(r, id, animClass, baseStyle, props, indent) {
         });
         out += `${indent}</div>\n`;
 
-        // モバイル対応: 768px以下は1カラム
+        // モバイル対応: 768px以下は1カラム / Mobile: single column at 768px and below.
         r.dynamicCss.push(
             `@media (max-width: 768px) { #${id} { grid-template-columns: 1fr !important; } }`
         );
@@ -222,6 +232,7 @@ export function renderArticleGrid(r, id, animClass, baseStyle, props, indent) {
     }
 
     // アコーディオン（開閉Q&A）。各項目のヘッダー/本文を出力し、開閉JSを dynamicJs に積む。
+    // Accordion (collapsible Q&A). Emits each item's header/body and pushes the toggle JS to dynamicJs.
 export function renderAccordion(r, id, animClass, baseStyle, props, indent) {
         const a = props.accordion || {};
         const items = Array.isArray(a.items) ? a.items : [];
@@ -252,7 +263,7 @@ export function renderAccordion(r, id, animClass, baseStyle, props, indent) {
         });
         out += `${indent}</div>\n`;
 
-        // 開閉JS
+        // 開閉JS / Open/close (toggle) JS
         r.dynamicJs.push(`
         (function() {
             var acc = document.getElementById('${id}');
