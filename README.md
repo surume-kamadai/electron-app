@@ -8,7 +8,7 @@ PHPやNode.jsのサーバーは不要。アプリ単体で動作します。
 https://github.com/user-attachments/assets/a5cc17ee-eacb-47a4-af77-0789a337249f
 
 
-
+##現在SiteBuilderのアドバイスやフィードバックを募集中です。SiteBuilderをさらによりよくしていくために皆様からのご意見をお待ちしています。
 ## 開発時の起動
 
 ```bash
