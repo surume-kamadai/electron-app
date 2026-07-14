@@ -1,6 +1,7 @@
 // ============================================================
-// JSONシリアライズ
-// Konvaノードをシーンデータ(JSON)に変換する
+// JSONシリアライズ / JSON serialization
+// Konvaノードをシーンデータ(JSON)に変換する。
+// Converts Konva nodes into scene data (JSON).
 // ============================================================
 import { currentCanvasWidth, currentCanvasHeight, currentDevice } from '../app/state.js';
 import { layer } from '../canvas/canvas.js';
@@ -10,6 +11,9 @@ import { saveCurrentDeviceLayout } from '../canvas/display.js';
  * Konvaノードを再帰的にシリアライズする。
  * ノードの現在位置を transform として保存する。
  * （スマホ表示中は呼び出し元が一時的にPC配置に戻してから処理する）
+ *
+ * Recursively serialize a Konva node, saving its current position as `transform`.
+ * (While in mobile view, the caller temporarily restores PC layout first.)
  */
 export function processNode(node) {
     const type   = node.getAttr('uiType');
@@ -20,6 +24,7 @@ export function processNode(node) {
     const h = type === 'Group' ? node.height() : node.height() * scaleY;
 
     // Circle/Triangle は中心座標なので左上座標に変換して保存
+    // Circle/Triangle use a center origin, so convert to top-left before saving.
     let x = Math.round(node.x());
     let y = Math.round(node.y());
     if (type === 'Circle') {
@@ -44,7 +49,9 @@ export function processNode(node) {
 }
 
 // スマホ表示中の各ノードを一時的にPC配置（transform）に戻すヘルパ。
+// Helper that temporarily restores each node to its PC layout (transform) while in mobile view.
 // 戻り値: 元のスマホ位置を保持した配列（後で元に戻すため）
+// Returns an array holding the original mobile positions (to restore afterward).
 function temporarilyRestorePcLayout() {
     const snapshots = [];
     layer.getChildren().forEach(node => {
@@ -56,7 +63,7 @@ function temporarilyRestorePcLayout() {
 
 function collectAndRestore(node, snapshots) {
     const type = node.getAttr('uiType');
-    // 今のスマホ表示中の位置を退避
+    // 今のスマホ表示中の位置を退避 / Stash the current (mobile-view) position.
     const snap = { node, x: node.x(), y: node.y(), w: node.width(), h: node.height() };
     if (type === 'Circle') { snap.rx = node.radiusX(); snap.ry = node.radiusY(); }
     snapshots.push(snap);
@@ -70,6 +77,7 @@ function collectAndRestore(node, snapshots) {
     // できないため、別策として bData.layouts.mobile が存在する場合のみ、PC値を
     // 保存しておく仕組みが必要。
     // 簡易策: bData._pcGeom があれば復元、無ければそのまま（PC配置と一致）。
+    // Simple approach: restore from bData._pcGeom if present; otherwise leave as-is (already PC layout).
     const bData = node.getAttr('bladeData');
     if (bData && bData._pcGeom) {
         const pc = bData._pcGeom;
@@ -101,19 +109,22 @@ function restoreFromSnapshots(snapshots) {
 }
 
 /**
- * ステージ全体をシリアライズしてシーンデータを返す
+ * ステージ全体をシリアライズしてシーンデータを返す。
+ * Serialize the whole stage and return the scene data.
  */
 export function generateSceneData(includeCanvas = true) {
     // スマホ表示中なら、まず現在の見た目を layouts.mobile に保存（ユーザー編集分の念のための退避）
+    // If in mobile view, first save the current look into layouts.mobile (safeguard the user's edits).
     saveCurrentDeviceLayout();
 
     // スマホ表示中は、保存処理の間だけノードをPC配置に戻す
+    // While in mobile view, restore nodes to PC layout just for the duration of saving.
     let snapshots = null;
     if (currentDevice === 'mobile') {
         snapshots = temporarilyRestorePcLayout();
     }
 
-    // canvas サイズは常にPC基準
+    // canvas サイズは常にPC基準 / Canvas size is always the PC baseline.
     let cw = currentCanvasWidth, ch = currentCanvasHeight;
     if (currentDevice === 'mobile') {
         cw = parseInt(document.getElementById('canvas-width')?.value)  || 800;
@@ -128,7 +139,7 @@ export function generateSceneData(includeCanvas = true) {
         if (child.hasName('ui-element')) data.elements.push(processNode(child));
     });
 
-    // スマホ表示に戻す
+    // スマホ表示に戻す / Restore the mobile view.
     if (snapshots) restoreFromSnapshots(snapshots);
 
     return data;
