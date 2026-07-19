@@ -1,8 +1,19 @@
-# Site Builder C# 移行計画書
+# Site Builder C# 移行計画書（v2）
 
-Electron + JavaScript 製の Site Builder を C# (.NET) へ移行するための具体的な計画書です。
-現行コードの棚卸し → 技術選定 → データモデル定義 → モジュール対応表 → 段階的な移行フェーズ →
-出力互換の保証方法、の順に示します。
+**最優先要件: 現在の見た目・機能・操作感を完全に維持したまま C# 化する。**
+
+この要件を踏まえ、v1（Avalonia でのフルネイティブ書き直し）から方針を改訂しました。
+UI をネイティブに書き直す限り「完全に同じ操作感」は原理的に保証できません。
+一方で本アプリの UI・編集機能は全て `src/renderer/`（HTML/CSS/JS 約7,600行）に閉じており、
+Electron 固有の部分は**わずか7つのブリッジAPIとメニューだけ**です（§3で実証）。
+
+したがって本計画は:
+
+> **既存の Web UI（renderer）を一切変更せずそのまま動かし、
+> Electron の殻と出力エンジンを C#（.NET）に置き換える。**
+
+これにより見た目・機能・操作感は「似せる」のではなく「同一のコードが動く」ことで保証されます。
+フルネイティブ化（v1案）は将来の任意ステップとして付録に残します。
 
 ---
 
@@ -13,449 +24,323 @@ Electron + JavaScript 製の Site Builder を C# (.NET) へ移行するための
 リポジトリ名に「Laravel」と付いていますが、**PHPコードは含まれていません**。
 実体は以下の構成の **Electron デスクトップアプリ** です。
 
-- **Electron メインプロセス** (`src/main/`): ウィンドウ生成、ネイティブメニュー、
-  ファイルダイアログ、プロジェクト書き出しの IPC 受け口（約300行）
-- **レンダラー** (`src/renderer/`): Konva ベースのキャンバスエディタ、
-  ドッキングパネル UI、HTML/Laravel Blade 生成エンジン（約7,600行）
-- 自作コード合計: **約7,900行**（vendor 同梱ライブラリを除く）
+- **Electron メインプロセス** (`src/main/`, 298行): ウィンドウ生成、ネイティブメニュー、
+  ファイルダイアログ、プロジェクト書き出しの IPC 受け口
+- **レンダラー** (`src/renderer/`, 約7,600行): Konva ベースのキャンバスエディタ、
+  ドッキングパネル UI、HTML/Laravel Blade 生成エンジン
+- 同梱ライブラリ: Konva（キャンバス）、GoldenLayout（ドッキング）、Pickr（カラーピッカー）、jQuery
 
-### 1.2 モジュール別の規模と責務
+### 1.2 「見た目・機能・操作感」がどこに実装されているか
 
-| モジュール | 行数 | 責務 | 移行難易度 |
-|---|---:|---|---|
-| `main/main.js` + `preload.js` | 298 | ウィンドウ・メニュー・ダイアログ・ファイルI/O (IPC) | ★ 低 |
-| `export/renderer.js` | 545 | シーンJSON → HTML/Blade 文字列生成エンジン | ★ 低（純ロジック） |
-| `export/exporter.js` | 302 | 静的サイト / Laravel プロジェクト一式の組み立て | ★ 低（純ロジック） |
-| `export/css-generator.js` | 191 | CSS生成の純粋ヘルパー（副作用なし） | ★ 低 |
-| `export/render-components.js` | 290 | Slider / ArticleGrid / Accordion のHTML生成 | ★ 低 |
-| `nodes/elements.js` | 501 | 要素の生成・グループ化・採番 | ★★ 中 |
-| `nodes/converter.js` | 134 | Konvaノード ⇄ シーンJSON 変換 | ★★ 中 |
-| `nodes/node-style.js` | 236 | 影・グラデーション・枠線などのKonva反映 | ★★ 中 |
-| `nodes/components.js` | 124 | テンプレ部品（Hero/Card/FAQ等）の定義 | ★ 低（データ定義） |
-| `nodes/warp.js` | 154 | テキストワープ変形 | ★★★ 高 |
-| `canvas/*`（7ファイル） | 1,015 | ステージ表示・定規・ズーム・プレビュー・エフェクト | ★★★ 高 |
-| `interaction/*`（4ファイル） | 809 | ドラッグ・リサイズ・スナップ・テキスト直接編集・クリップボード | ★★★ 高 |
-| `inspector/*`（7ファイル） | 1,393 | プロパティパネル（色・スライダー・アコーディオン編集） | ★★ 中 |
-| `explorer/` + `project/` + `ui/` | 1,045 | レイヤー一覧・ページ/フォルダ管理・ドックレイアウト・トースト | ★★ 中 |
-| `history/history.js` | 80 | Undo（シーン全体のスナップショット方式） | ★ 低 |
-| `app/state.js` + `main-renderer.js` | 229 | 共有ステート・起動時の配線 | ★ 低 |
-| テスト（vitest） | 273 | exporter / renderer の単体テスト | ★ 低（移植必須） |
-
-### 1.3 外部依存ライブラリと C# 代替
-
-| 現行 (JS) | 用途 | C# 代替 |
+| 体験要素 | 実装場所 | C#移行での扱い |
 |---|---|---|
-| Konva 9.x | 2Dキャンバス・シーングラフ・変形ハンドル | **SkiaSharp + 自作シーングラフ**（§6参照） |
-| GoldenLayout 1.5 | ドッキングパネル | **Dock.Avalonia**（NuGet: `Dock.Avalonia`） |
-| @simonwep/pickr | カラーピッカー | Avalonia 標準の `ColorPicker`（`Avalonia.Controls.ColorPicker`） |
-| jQuery | DOM操作 | 不要（XAML + データバインディングで代替） |
-| Electron / electron-builder | シェル・配布 | .NET ランタイム + **Velopack**（Win）/ dmg 生成（Mac） |
-| vitest | テスト | **xUnit**（+ `Verify` スナップショットテスト） |
+| パネルレイアウト・ドッキング | renderer (GoldenLayout + dock-layout.js) | **無改変で流用** |
+| キャンバス編集（選択・ドラッグ・スナップ・Group挙動・Spaceパン） | renderer (Konva + interaction/) | **無改変で流用** |
+| プロパティパネル・カラーピッカー・各エディタ | renderer (inspector/) | **無改変で流用** |
+| ページ/フォルダ・エクスプローラー・Undo・プレビュー | renderer | **無改変で流用** |
+| キーボードショートカット | renderer (events.js) ＋ メニューaccelerator | ほぼ流用（§4.3） |
+| ネイティブメニュー（ファイル/編集/表示/ヘルプ） | main.js (Electron Menu) | **C#で再実装**（§4.3） |
+| ファイルダイアログ・書き出し・画像選択 | main.js (Electron dialog/fs) | **C#で再実装**（OSネイティブダイアログなので見た目同一） |
+| HTML/Blade 出力エンジン | renderer (export/, 純ロジック1,328行) | **C#へ移植**（出力バイト一致を保証、§6） |
 
-### 1.4 データフロー（これが移行の背骨）
+つまり操作感を決めるコードの実体はほぼ全て renderer にあり、そこは触りません。
 
-```
-[編集]  Konvaノードツリー ⇄ (converter.js) ⇄ シーンJSON (project.json)
-[出力]  シーンJSON → exporter.js → HtmlRenderer → 静的HTML一式 / Laravelプロジェクト一式
-[保存]  シーンJSON → main.js IPC → ディスク
-```
+### 1.3 Electron 依存の全リスト（これだけ置き換えれば良い）
 
-**シーンJSON（project.json）がアプリの中心データであり、この互換性を保てば
-既存ユーザーのプロジェクトはそのまま C# 版で開けます。** 移行の絶対条件とします。
+`preload.js` が renderer に公開している API は以下の **7つで全て**です
+（renderer 側の利用箇所は `project/api.js` に集約済み）:
+
+| API | 方向 | 内容 |
+|---|---|---|
+| `exportProject(payload)` | JS→C# | `{files:[{path,content}], images:[{path,dataUrl}], projectName, targetDir?}` を受けてディスク書き出し。初回はフォルダ選択ダイアログ |
+| `pickImage()` | JS→C# | 画像選択ダイアログ → `{dataUrl, name}` を返す |
+| `saveScene(jsonStr)` | JS→C# | 保存ダイアログ → JSON書き出し |
+| `loadScene()` | JS→C# | 開くダイアログ → `{content, dirPath}` を返す |
+| `onMenuAction(cb)` | C#→JS | メニュー操作（new-project / open-project / save-export / undo / reset-layout）の通知 |
+| `onTogglePanel(cb)` | C#→JS | 「表示」メニューのパネル開閉 `{id, show}` の通知 |
+| `notifyPanelState(id, open)` | JS→C# | パネル開閉をメニューのチェックへ同期 |
+
+加えてメニューの role 系（cut/copy/paste/quit/reload/devtools）と、
+外部リンクを既定ブラウザで開く処理、`safeResolve()`（パストラバーサル遮断）が main.js にあります。
 
 ---
 
 ## 2. 技術選定
 
-### 2.1 UIフレームワークの比較
+### 2.1 ホスト方式の比較
 
-現行は `build:win`（NSIS）と `build:mac`（dmg）の**両OS対応**なので、これを維持できるかが軸です。
+「UIを無改変で動かす」ための C# ホストの選択肢:
 
-| 候補 | Win | Mac | キャンバス描画 | 評価 |
+| 候補 | Win | Mac | 描画エンジン | 評価 |
 |---|:-:|:-:|---|---|
-| **Avalonia UI 11**（推奨） | ○ | ○ | 内部が Skia。カスタム描画・ヒットテストが素直に書ける | ◎ 唯一 Win/Mac 両対応の成熟デスクトップXAML |
-| WPF | ○ | × | DrawingVisual等で可能 | △ Mac対応を捨てることになる |
-| WinUI 3 | ○ | × | Win2D | △ 同上 |
-| .NET MAUI | ○ | ○ | GraphicsView | △ デスクトップのメニュー/ドッキング等が弱い |
-| Blazor Hybrid | ○ | ○ | Konvaをそのまま流用 | ○ ただしUI層はJSのまま＝「C#移行」にならない（§10の代替案） |
+| **Photino.NET**（推奨） | ○ | ○ | Win: WebView2(Chromium) / Mac: WKWebView | ◎ Electron代替を目的とした純.NETホスト。軽量・配布サイズ小。Node/Electron完全排除 |
+| Electron.NET | ○ | ○ | Chromium（Electronそのまま） | ○ 見た目・メニュー完全同一だが Electron+Node が残り「脱Electron」にならない。メンテ状況に不安 |
+| WPF + WebView2 | ○ | × | Chromium | △ Mac対応を失う |
+| Avalonia + WebView系 | ○ | ○ | CefGlue等 | △ 依存が重く、Photinoに対する利点が薄い |
 
-**結論: .NET 8 LTS + Avalonia UI 11 + SkiaSharp を採用します。**
+**結論: .NET 8 LTS + Photino.NET を採用します。**
 
-- Avalonia は XAML/MVVM で WPF 経験者がそのまま書け、描画基盤が Skia なので
-  Konva 相当のカスタムキャンバスとの相性が良い。
-- Dock.Avalonia が GoldenLayout 相当のドッキング（タブ化・フロート・表示切替）を提供。
-- 1つのコードベースで Windows (.exe) / macOS (.dmg) を出力でき、現行の配布形態を維持できる。
+- Windows は WebView2 = Chromium なので、現行 Electron（Chromium）と**描画・挙動が実質同一**
+- macOS は WKWebView（Safari系）になる。Konva / GoldenLayout / Pickr はいずれも
+  Safari 対応済みライブラリだが、差異検証を Phase 1 の完了条件に含める（§7 リスク参照）。
+  万一許容できない差異が出た場合のみ、Mac に限り Electron.NET 併用へ退避可能
+- 万全を期すなら Electron.NET 案（UI殻まで完全同一）も §2.1 の通り選択肢として温存
 
-### 2.2 採用パッケージ一覧（具体名）
+### 2.2 採用パッケージ
 
 | パッケージ | 用途 |
 |---|---|
-| `Avalonia` / `Avalonia.Desktop` / `Avalonia.Themes.Fluent` (11.x) | UI基盤 |
-| `CommunityToolkit.Mvvm` (8.x) | MVVM（`[ObservableProperty]`, `RelayCommand`） |
-| `Dock.Avalonia` (11.x) | ドッキングレイアウト |
-| `SkiaSharp` (2.88+) | キャンバス描画（Avalonia経由 or カスタムコントロール） |
-| `System.Text.Json`（標準） | project.json のシリアライズ |
-| `xunit` + `Verify.Xunit` | 単体テスト・スナップショットテスト |
-| `Velopack` | Windows 配布（自動更新付きインストーラ） |
+| `Photino.NET` (3.x) | ネイティブウィンドウ + OS WebView ホスト |
+| `System.Text.Json`（標準） | project.json / ブリッジメッセージのシリアライズ |
+| `xunit` + ゴールデンファイル比較 | 出力エンジンの互換テスト（§6） |
+| `Velopack` | Windows 配布（NSIS 相当のインストーラ + 自動更新） |
+| `dotnet publish` + create-dmg | macOS 配布（dmg） |
 
 ---
 
-## 3. ソリューション構成
+## 3. 新アーキテクチャ
 
-**UI非依存の Core と、Avalonia 依存の App を厳密に分離**します。
-出力エンジンとデータモデルを先に Core として完成させ、テストで固めてから UI を作る戦略です。
+```
+┌─────────────────────────────────────────────┐
+│ SiteBuilder.Host (C# / Photino.NET)          │
+│  ・ウィンドウ生成 / メニュー / ダイアログ     │
+│  ・ブリッジ7APIの実装 (§4)                    │
+│  ・ExportWriter (safeResolve 含む)            │
+│  ┌─────────────────────────────────────┐    │
+│  │ OS WebView                           │    │
+│  │  src/renderer/ 一式を無改変でロード   │    │
+│  │  (Konva / GoldenLayout / inspector / │    │
+│  │   canvas / interaction / export ...) │    │
+│  └─────────────────────────────────────┘    │
+└─────────────────────────────────────────────┘
+        │ Step 2 で出力エンジンを移設
+        ▼
+  SiteBuilder.Core (C#)  … HtmlRenderer / StaticSiteBuilder / LaravelProjectBuilder
+```
 
 ```
 SiteBuilder.sln
 ├─ src/
-│  ├─ SiteBuilder.Core/                  # UI依存ゼロ（net8.0）
-│  │  ├─ Models/
-│  │  │  ├─ ProjectData.cs              # project.json 互換モデル（§4）
-│  │  │  ├─ PageData.cs / FolderData.cs
-│  │  │  ├─ ElementData.cs / TransformData.cs / ElementProperties.cs
-│  │  │  └─ ProjectSerializer.cs        # System.Text.Json 設定を一元化
-│  │  ├─ Export/
-│  │  │  ├─ HtmlRenderer.cs             # ← renderer.js
-│  │  │  ├─ CssHelpers.cs               # ← css-generator.js
-│  │  │  ├─ ComponentRenderers.cs       # ← render-components.js
-│  │  │  ├─ StaticSiteBuilder.cs        # ← exporter.js buildStaticProject
-│  │  │  ├─ LaravelProjectBuilder.cs    # ← exporter.js buildLaravelProject
-│  │  │  └─ ExportPayload.cs            # { Files, Images } 出力物モデル
-│  │  └─ Services/
-│  │     ├─ ExportWriter.cs             # ← main.js export-project（safeResolve含む）
-│  │     └─ ImageStore.cs               # data:URL画像のメモリ管理
-│  │
-│  └─ SiteBuilder.App/                   # Avalonia（net8.0）
-│     ├─ Program.cs / App.axaml
-│     ├─ Views/
-│     │  ├─ MainWindow.axaml            # メニュー + Dock.Avalonia レイアウト
-│     │  ├─ Panels/                     # Tools / Pages / Explorer / Settings / Inspector
-│     │  └─ Dialogs/
-│     ├─ ViewModels/                    # 各パネルの VM（CommunityToolkit.Mvvm）
-│     ├─ CanvasEditor/                  # ← canvas/ + nodes/ + interaction/（§6）
-│     │  ├─ EditorCanvasControl.cs      # Skia描画のカスタムControl
-│     │  ├─ SceneGraph/                 # EditorNode / GroupNode / TextNode ...
-│     │  ├─ Tools/                      # 選択・移動・リサイズ・スナップ・パン
-│     │  ├─ Adorners/                   # 変形ハンドル・ガイド・定規
-│     │  └─ History/UndoService.cs      # ← history.js（スナップショット方式を踏襲）
-│     └─ Services/
-│        ├─ DialogService.cs            # ← main.js の各ダイアログIPC
-│        └─ PreviewService.cs           # ← preview.js（§6.5）
-│
-└─ tests/
-   └─ SiteBuilder.Core.Tests/
-      ├─ HtmlRendererTests.cs           # ← renderer.test.js 移植
-      ├─ ExporterTests.cs               # ← exporter.test.js 移植
-      └─ GoldenFiles/                   # JS版出力との一致検証用（§8）
+│  ├─ SiteBuilder.Host/            # Photino ホスト（ウィンドウ・メニュー・ブリッジ・I/O）
+│  │  ├─ Program.cs
+│  │  ├─ Bridge/BridgeDispatcher.cs   # §4.2 のメッセージルータ
+│  │  ├─ Bridge/DialogService.cs      # フォルダ/ファイル/画像ダイアログ
+│  │  ├─ Bridge/ExportWriter.cs       # main.js の export-project 相当 + SafeResolve
+│  │  └─ wwwroot/ → ../renderer へのリンク（renderer は現位置のまま）
+│  ├─ SiteBuilder.Core/            # Step 2: 出力エンジン + モデル（UI依存ゼロ）
+│  │  ├─ Models/…                     # §5 の project.json 互換モデル
+│  │  └─ Export/…                     # HtmlRenderer / CssHelpers / 各Builder
+│  └─ renderer/                    # 既存 src/renderer を無改変で移設（または現位置参照）
+│     └─ host-bridge.js            # ★唯一の追加ファイル（§4.1、preload.js の代替 shim）
+└─ tests/SiteBuilder.Core.Tests/   # ゴールデンテスト（§6）
 ```
 
-**ポイント: Electron の main/renderer 間 IPC は全廃**できます。C# では
-ダイアログもファイルI/Oも同一プロセスなので、`export-project` / `load-scene` /
-`pick-image` / `save-scene` の4つの IPC ハンドラは `DialogService` +
-`ExportWriter` の直接メソッド呼び出しになります。
+**renderer 本体のコードには手を入れません。** 追加は `host-bridge.js` 1ファイルと、
+`index.html` にそれを読み込む `<script>` 1行のみです。
 
 ---
 
-## 4. データモデルの C# 定義（project.json 互換）
+## 4. ブリッジ実装仕様（操作感維持の要）
 
-既存の project.json をそのまま読み書きできるよう、**camelCase + null許容**で定義します。
+### 4.1 renderer 側 shim（host-bridge.js、約40行の新規ファイル）
 
-```csharp
-// Models/ProjectData.cs
-public sealed class ProjectData
-{
-    public ProjectSettings Settings { get; set; } = new();
-    public List<FolderData> Folders { get; set; } = [];
-    public List<PageData> Pages { get; set; } = [];
-    public string ActivePageId { get; set; } = "page_1";
-}
+Photino の `window.external.sendMessage` / `receiveMessage` の上に、
+**preload.js と完全に同じ形の `window.electronAPI`** を定義します。
+これにより `project/api.js` 以下の既存コードは 1 文字も変わりません。
 
-public sealed class ProjectSettings
-{
-    public string ProjectName { get; set; } = "my-site";
-    public CanvasSettings Canvas { get; set; } = new();
-    public string OutputType { get; set; } = "static";   // "static" | "laravel"
-    public bool SeparateCss { get; set; } = true;
-    public string SiteBgColor { get; set; } = "#f1f2f6";
-    public SeoSettings Seo { get; set; } = new();
-}
+```js
+// host-bridge.js — window.electronAPI を Photino メッセージング上に再現する
+(function () {
+    let seq = 0;
+    const pending = new Map();          // 要求ID → resolve
+    const listeners = { 'menu-action': [], 'toggle-panel': [] };
 
-public sealed class CanvasSettings
-{
-    public int Width { get; set; } = 800;
-    public int Height { get; set; } = 600;
-    public int MobileWidth { get; set; } = 375;
-    public int MobileHeight { get; set; } = 800;
-}
+    window.external.receiveMessage((raw) => {
+        const msg = JSON.parse(raw);
+        if (msg.replyTo != null) {                    // C#からの応答
+            pending.get(msg.replyTo)?.(msg.result);
+            pending.delete(msg.replyTo);
+        } else if (listeners[msg.channel]) {          // C#からのイベント
+            listeners[msg.channel].forEach(cb => cb(msg.payload));
+        }
+    });
 
-public sealed class PageData
-{
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
-    public List<ElementData> Elements { get; set; } = [];
-    public string? FolderId { get; set; }
-    public string BgColor { get; set; } = "";
-    public SeoSettings Seo { get; set; } = new();
-}
+    function invoke(channel, payload) {
+        return new Promise((resolve) => {
+            const id = ++seq;
+            pending.set(id, resolve);
+            window.external.sendMessage(JSON.stringify({ id, channel, payload }));
+        });
+    }
 
-public sealed class ElementData
-{
-    public string Id { get; set; } = "";
-    public string Type { get; set; } = "";   // Button/Rect/Circle/Triangle/Group/TextInput/Label/Image/Slider/...
-    public TransformData Transform { get; set; } = new();
-    public ElementProperties Properties { get; set; } = new();
-    public List<ElementData>? Children { get; set; }    // Group のみ
-}
-
-public sealed class TransformData
-{
-    public int X { get; set; }
-    public int Y { get; set; }
-    public int Width { get; set; }
-    public int Height { get; set; }
-}
-```
-
-`properties` は要素タイプごとにキーが揺れる（`bgcolor`, `text`, `fontsize`, `role`,
-`route`, `animation`, `shadow`, `bgimage`, `visible`, `lock`, `event` ...）ため、
-**既知プロパティは型付き + 未知キーは `[JsonExtensionData]` で保持**します。
-これにより「古い/新しいバージョンの project.json を開いても情報を落とさない」ことを保証します。
-
-```csharp
-public sealed class ElementProperties
-{
-    public string? Name { get; set; }
-    public string? Text { get; set; }
-    public string? BgColor { get; set; }        // JSON名 "bgcolor"（JsonPropertyName指定）
-    public string? Color { get; set; }
-    public double? FontSize { get; set; }       // "fontsize"
-    public string? FontFamily { get; set; }     // "fontfamily"
-    public string? Align { get; set; }
-    public string? Shadow { get; set; }
-    public string? Animation { get; set; }
-    public string? Role { get; set; }           // Button: "submit" 等
-    public string? Route { get; set; }          // フォーム action / リンク先
-    public bool? Visible { get; set; }
-    public bool? Lock { get; set; }
-
-    [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; set; }  // 未知キーの保全
-}
-```
-
-シリアライズ設定は 1 箇所に集約します:
-
-```csharp
-public static class ProjectSerializer
-{
-    public static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, // 日本語をエスケープしない
-        WriteIndented = true,
+    window.electronAPI = {
+        exportProject: (payload) => invoke('export-project', payload),
+        pickImage:     ()        => invoke('pick-image'),
+        saveScene:     (json)    => invoke('save-scene', json),
+        loadScene:     ()        => invoke('load-scene'),
+        onMenuAction:  (cb) => listeners['menu-action'].push((a) => cb(a)),
+        onTogglePanel: (cb) => listeners['toggle-panel'].push((p) => cb(p)),
+        notifyPanelState: (id, open) =>
+            window.external.sendMessage(JSON.stringify({ channel: 'panel-state-changed', payload: { id, open } })),
     };
-}
+})();
 ```
 
----
-
-## 5. モジュール対応マップ（JS → C#）
-
-| 現行 JS | C# 側 | 備考 |
-|---|---|---|
-| `main/main.js` ウィンドウ・メニュー | `MainWindow.axaml` + `NativeMenu` | Avalonia は Mac ネイティブメニューにも対応 |
-| `main/main.js` `safeResolve()` | `ExportWriter.SafeResolve()` | `Path.GetFullPath` + 前方一致検査で同一実装。パストラバーサル遮断は必ず維持 |
-| `main/main.js` 各 IPC | `DialogService` / `ExportWriter` の直接呼び出し | IPC 層は消滅 |
-| `main/preload.js` | 不要 | 同上 |
-| `app/state.js` | `EditorState`（シングルトンVM） | 選択・デバイス(pc/mobile)・キャンバスサイズ |
-| `app/main-renderer.js` | `App.axaml.cs` + DI 登録 | 起動時の配線 |
-| `project/project.js` | `ProjectService` | ページ/フォルダのCRUD・切替 |
-| `project/api.js` | `DialogService` | 保存/読込/画像選択 |
-| `nodes/converter.js` | `SceneSerializer`（SceneGraph ⇄ ElementData） | Circle/Triangle の中心→左上座標変換も移植 |
-| `nodes/elements.js` | `NodeFactory` + `EditorState.ApplySelection` | タイプ別連番採番（`nextNumberForType`）も移植 |
-| `nodes/node-style.js` | `NodeStylePainter`（SkiaSharp描画側） | 影・グラデ・枠線 |
-| `nodes/components.js` | `ComponentTemplates`（静的データ） | Hero/Card/FAQ/Slider/ArticleGrid/Accordion のJSON定義をそのまま C# オブジェクトに |
-| `nodes/warp.js` | `TextWarpRenderer`（`SKPath` + `SKTextBlob`） | 難所。Phase 5 送り |
-| `canvas/canvas.js` `display.js` | `EditorCanvasControl` | Skia描画・ズーム・パン |
-| `canvas/rulers.js` | `RulerControl` + ガイド管理 | |
-| `canvas/canvas-preview.js` `offscreen.js` | `SKSurface` オフスクリーン描画 | サムネイル生成 |
-| `canvas/gradient-overlay.js` `effect-overlay.js` | Adorner レイヤー | |
-| `interaction/events.js` | `SelectionTool` / `SnapEngine` | ドラッグ・リサイズ・Shift複数選択・Alt吸着オフ・Spaceパン |
-| `interaction/transform-normalize.js` | `TransformNormalizer` | scale→width/height 正規化 |
-| `interaction/text-edit.js` | キャンバス上に `TextBox` をオーバーレイ配置 | ダブルクリック編集 |
-| `interaction/clipboard.js` | `ClipboardService`（ElementData の JSON をコピー） | |
-| `history/history.js` | `UndoService` | **シーン全体スナップショット方式を踏襲**（実装80行の単純さを維持） |
-| `inspector/*` | `InspectorView` + タイプ別テンプレート | XAML の `DataTemplate` 切替で実現。slider-editor / accordion-editor は専用サブビュー |
-| `explorer/*` | `ExplorerView`（TreeView） / `PagesView` | ドラッグ並べ替え対応 |
-| `ui/dock-layout.js` | Dock.Avalonia のレイアウト定義 | パネル表示切替・初期状態リセット |
-| `ui/toast.js` | `ToastService`（`WindowNotificationManager`） | Avalonia 標準機能 |
-| `ui/settings-ui.js` | `SettingsView` | |
-| `preview/preview.js` | `PreviewService` | §6.5 参照 |
-| `export/*` | `SiteBuilder.Core.Export.*` | §3 の通り 1:1 対応。**最優先で移植** |
-
----
-
-## 6. キャンバスエディタの設計（最大の難所）
-
-Konva が担っていた「シーングラフ + ヒットテスト + 変形ハンドル」は自作します。
-必要機能は限定的（矩形ベースの要素、回転なし、8方向リサイズ）なので、フル互換の
-Konva クローンは不要です。
-
-### 6.1 シーングラフ
+### 4.2 C# 側ディスパッチャ
 
 ```csharp
-public abstract class EditorNode
+// Bridge/BridgeDispatcher.cs（骨子）
+window.RegisterWebMessageReceivedHandler(async (sender, raw) =>
 {
-    public string Id { get; set; } = "";
-    public string UiType { get; set; } = "";
-    public double X, Y, Width, Height;
-    public ElementProperties Props { get; set; } = new();
-    public GroupNode? Parent { get; set; }
-
-    public abstract void Render(SKCanvas canvas);          // 描画
-    public virtual bool HitTest(SKPoint p) =>              // ヒットテスト
-        p.X >= X && p.X <= X + Width && p.Y >= Y && p.Y <= Y + Height;
-}
-// 派生: RectNode, CircleNode, TriangleNode, TextNode(Label/Button/TextInput),
-//        ImageNode, GroupNode(children保持), SliderNode, AccordionNode ...
+    var msg = JsonSerializer.Deserialize<BridgeMessage>(raw)!;
+    object? result = msg.Channel switch
+    {
+        "export-project"      => await _exportWriter.ExportAsync(msg.Payload),  // main.jsと同一仕様
+        "pick-image"          => await _dialogs.PickImageAsync(),               // → {dataUrl, name}
+        "save-scene"          => await _dialogs.SaveSceneAsync(msg.Payload),
+        "load-scene"          => await _dialogs.LoadSceneAsync(),               // → {content, dirPath}
+        "panel-state-changed" => _menu.SyncPanelCheck(msg.Payload),             // 応答不要
+        _ => null,
+    };
+    if (msg.Id is int id)
+        window.SendWebMessage(JsonSerializer.Serialize(new { replyTo = id, result }));
+});
 ```
 
-### 6.2 描画コントロール
+`ExportWriter` は main.js の挙動を**仕様として**移植します:
 
-`EditorCanvasControl : Control` が Avalonia の `Render()` 内で
-`context.Custom(...)` → SkiaSharp lease を取り、以下の順で描く:
+- `targetDir` 未指定時のみフォルダ選択ダイアログ → `選択フォルダ/プロジェクト名/` に出力
+- `SafeResolve(baseDir, relPath)`: `Path.GetFullPath` 結果が `baseDir` 配下でなければ例外
+  （パストラバーサル遮断。**現行の安全策を必ず維持**）
+- 成否は `{success, path}` / `{success:false, message}` で返す（キャンセル時メッセージ
+  「キャンセルされました」も一致させる — renderer がこの文字列でトースト分岐しているため）
 
-1. キャンバス背景（bgColor）
-2. シーングラフを再帰描画（`visible=false` はスキップ、Group は座標系を平行移動）
-3. 選択枠 + 8ハンドル（Konva Transformer 相当）
-4. スナップガイド線・定規・ドラッグ矩形
+### 4.3 メニュー
 
-ズーム/パンは `SKMatrix` 1枚で管理し、マウス座標は逆行列でシーン座標へ変換します。
+main.js のメニュー定義（ファイル/編集/表示/ヘルプ、パネル表示チェック、
+`CmdOrCtrl+Z` 等）を C# 側で再現します。
 
-### 6.3 インタラクション（events.js の移植方針）
+- **Windows**: 現行 Electron もウィンドウ内メニューバー表示のため、
+  Win32 ネイティブメニュー（P/Invoke）または HTML メニューバーで同位置・同項目を再現
+- **macOS**: 現行はグローバルメニューバー。Photino の Mac メニュー対応状況を Phase 1 冒頭で
+  検証し、不足があれば NSMenu を interop で構築（項目数が少ないため現実的）
+- role 系（切り取り/コピー/貼り付け）は WebView の標準編集コマンドへ委譲、
+  `再読み込み`/`開発者ツール` は WebView API で同等機能を提供
+- 外部リンクは現行同様、既定ブラウザで開く（アプリ内遷移は遮断）
 
-現行の挙動仕様をそのまま要件化します:
+### 4.4 その他の互換ポイント
 
-- クリック選択 / Shift+クリックで範囲・追加選択（`lastClickedNode` 起点）
-- Group クリック→Group移動、Group内子クリック→子だけ移動（draggable制御の移植）
-- 近接要素・ガイドへの吸着、**Alt 押下中は吸着オフ**
-- **Space 押下中はパンモード**（全ノードのドラッグ禁止）
-- `lock` プロパティの要素は移動不可
-- リサイズ後は scale を width/height に正規化（transform-normalize.js 準拠）
-
-### 6.4 レスポンシブ（PC/Mobile 2レイアウト）
-
-`display.js` の「デバイス切替時に transform セットを退避・復元する」方式を踏襲し、
-`EditorNode` に `PcLayout` / `MobileLayout` の2つの Rect を持たせ、シリアライズ時は
-現行仕様どおり **PC配置に一時復元してから保存**します（converter.js の
-`temporarilyRestorePcLayout` 相当）。
-
-### 6.5 プレビュー
-
-現行 preview.js は生成HTMLをアプリ内表示しています。C# 版は2段階で対応します:
-
-- **Phase 2（暫定）**: HtmlRenderer の出力を一時フォルダへ書き、既定ブラウザで開く（実装数行）
-- **Phase 5（本対応）**: `WebViewControl-Avalonia` 等の WebView でアプリ内プレビュー
+- **オートセーブの localStorage バックアップ**（api.js）: WebView のプロファイル保存先を
+  固定ディレクトリに設定し、アプリ更新後もバックアップが残ることを確認する
+- **画像のドラッグ＆ドロップ**: renderer 内の `FileReader` 処理で完結しており WebView でもそのまま動く
+- **ウィンドウ**: 1400×900・最小 1000×700 を同値で設定
 
 ---
 
-## 7. 移行フェーズ（実行計画）
+## 5. 出力エンジンの C# 化（Step 2）と互換データモデル
 
-「**純ロジックでテスト済みの出力エンジンから先に移植し、UIは後**」が方針です。
-各フェーズに完了条件を付けます。工数は専任1名の目安です。
+UI と切り離せる純ロジック（`export/` 1,328行）を `SiteBuilder.Core` へ移植します。
+移植中も**アプリは JS 版エンジンで動き続ける**ため、ユーザー影響ゼロで進められます。
 
-### Phase 0: 足場づくり（0.5週）
-- ソリューション作成、CI（`dotnet build` / `dotnet test` の GitHub Actions）
-- **完了条件**: 空の Avalonia ウィンドウが Win/Mac で起動する
+- データモデル: project.json と**無変換互換**の C# クラス群
+  （camelCase、既知プロパティは型付き、未知キーは `[JsonExtensionData]` で往復保全）
+- 対応: `renderer.js → HtmlRenderer.cs` / `css-generator.js → CssHelpers.cs` /
+  `render-components.js → ComponentRenderers.cs` /
+  `exporter.js → StaticSiteBuilder.cs + LaravelProjectBuilder.cs`
+- 切替方法: ブリッジに `export-project-v2`（project JSON を受けて C# 側で生成）を追加し、
+  設定フラグで JS 生成と切替可能にする。ゴールデンテスト（§6）で一致確認後に既定を C# へ
+- vitest のテスト 273 行は xUnit へ移植
 
-### Phase 1: Core 移植 — 出力エンジンとモデル（2〜3週）★最重要
-- §4 のモデル + `ProjectSerializer`（既存 project.json の読み書き互換）
-- `CssHelpers` → `ComponentRenderers` → `HtmlRenderer` → `StaticSiteBuilder` /
-  `LaravelProjectBuilder` の順に移植（依存の少ない順）
-- vitest 273行を xUnit へ移植 + **ゴールデンテスト**（§8）
-- **完了条件**: JS版と同一入力から**バイト一致のHTML/Blade/routes/FormController.php**が出る
-- この時点で「project.json を食わせて書き出すだけの CLI」(`SiteBuilder.Cli`) を作れば、
-  UI完成前から実用検証が可能
-
-### Phase 2: アプリシェル（2週）
-- MainWindow + メニュー（ファイル/編集/表示/ヘルプ、パネル表示チェック同期）
-- Dock.Avalonia で6パネル配置（ツール/ページ/エクスプローラー/キャンバス/設定/プロパティ）+ レイアウトリセット
-- `DialogService`（開く/保存/画像選択/出力先フォルダ選択）、`ExportWriter`（safeResolve 移植込み）
-- **完了条件**: 既存 project.json を開いて（表示はまだ簡易でよい）そのまま書き出せる
-
-### Phase 3: キャンバス最小編集（3〜4週）
-- §6 のシーングラフ + 描画 + 選択/移動/リサイズ/削除 + タイプ別採番
-- Undo（スナップショット方式）、ズーム/パン、SceneSerializer（ページ切替に必要）
-- **完了条件**: 8基本要素を配置・編集・保存・出力する一連の操作が成立
-
-### Phase 4: インスペクタとプロジェクト管理（3週）
-- プロパティパネル（位置/色/フォント/角丸/影/グラデ/アニメ/フォーム設定/整列）
-- ページ・フォルダ管理、エクスプローラー（並び順・表示切替）、プロジェクト設定/SEO
-- **完了条件**: README 記載の「プロパティ」「ページとフォルダ」節の機能が全て動く
-
-### Phase 5: 応用機能（3〜4週）
-- テンプレ部品（Hero/Card/FAQ/Slider/ArticleGrid/Accordion）
-- レスポンシブ PC/Mobile、定規とガイド、スナップ、テキスト直接編集、
-  クリップボード、画像D&D、テキストワープ、アプリ内プレビュー
-- **完了条件**: README の機能一覧を C# 版で全て再現
-
-### Phase 6: 配布と切替（1〜2週）
-- Velopack で Win インストーラ、`dotnet publish` + create-dmg で Mac 版
-- README 更新、Electron 版は1リリース分並行維持 → 問題なければ廃止
-- **完了条件**: 両OSのインストーラ配布 + 既存プロジェクトファイルでの動作確認
-
-**合計目安: 約3.5〜4.5ヶ月（専任1名）。** Phase 1 完了時点で出力品質は保証されるため、
-以降のリスクは UI 再現のみに限定されます。
+※ v1 計画の §4「データモデルの C# 定義」の具体コードはそのまま本 Step で使用します
+（[付録A](#付録a-v1フルネイティブ化案の要約) 参照）。
 
 ---
 
-## 8. 出力互換の保証（ゴールデンテスト）
+## 6. 互換性の保証方法（テスト戦略）
 
-「C#版に替えたら生成HTMLが変わった」を防ぐ仕組みを最初に作ります。
+「そのまま使える」を機械的に検証します。
 
-1. JS 側に使い捨てスクリプトを追加し、代表的なプロジェクト
-   （全要素タイプ・Group入れ子・複数ページ・フォルダ・フォーム・CSS分離ON/OFF ×
-   static/laravel）の**出力一式をフィクスチャとして `tests/GoldenFiles/` に保存**
-2. C# 側テストで同じ入力 JSON から `StaticSiteBuilder` / `LaravelProjectBuilder` を実行し、
-   **ファイルパス集合と各ファイル内容をバイト比較**
-3. 差分が出たら改行コード・エスケープ・数値整形（`Math.Round` と JS `Math.round` の
-   負数丸め差に注意）を疑う
-
-これで exporter/renderer 系 1,300 行の移植品質を機械的に担保できます。
+1. **UI互換**: renderer を無改変流用するため、UI ロジックの互換テストは不要。
+   代わりに「Electron 依存7API + メニュー」の**受け入れチェックリスト**
+   （README の全機能節: ツール/プロパティ/マウス操作/ショートカット/ページとフォルダ/
+   レスポンシブ/定規とガイド/プレビュー/保存と読み込み/出力タイプ）を Electron 版と
+   並べて同一挙動確認する
+2. **出力互換（ゴールデンテスト）**: 代表プロジェクト（全要素タイプ・Group入れ子・複数ページ・
+   フォルダ・フォーム・CSS分離ON/OFF × static/laravel）について、JS 版出力一式を
+   フィクスチャ保存し、C# 版 `SiteBuilder.Core` の出力と**パス集合・ファイル内容をバイト比較**
+3. **プロジェクト互換**: 既存 project.json の読み込み → 再保存でデータが欠落しないことを
+   ラウンドトリップテストで保証
 
 ---
 
-## 9. リスクと対策
+## 7. 移行ステップ（実行計画）
+
+工数は専任1名の目安です。v1 案（約4ヶ月）に対し、**約1.5〜2ヶ月**で完了します。
+
+### Step 0: 足場（0.5週）
+- ソリューション作成、CI（`dotnet build/test` + 既存 `vitest` の並走）
+- **Mac の WKWebView / メニュー対応の技術検証**（リスクの早期潰し込み）
+- 完了条件: Photino ウィンドウで renderer の画面が表示される
+
+### Step 1: Electron 殻の C# 置換（2〜3週）★ここで「そのまま動く」を達成
+- `host-bridge.js` shim + `BridgeDispatcher` + `DialogService` + `ExportWriter`（safeResolve込み）
+- メニュー再現（Win / Mac）、外部リンク処理、ウィンドウ設定
+- §6-1 の受け入れチェックリストを Electron 版と突き合わせ
+- 完了条件: **既存 UI が無改変で全機能動作し、Electron/Node への依存が消える**。
+  この時点で配布可能（出力エンジンはまだ JS 版のまま＝出力も従来と完全同一）
+
+### Step 2: 出力エンジンの C# 移植（2〜3週）
+- §5 のモデル + Export 群を移植、vitest→xUnit 移植、ゴールデンテストでバイト一致
+- フラグで JS/C# 生成を切替 → 一致確認後に C# を既定化
+- 完了条件: ゴールデンテスト全通過、C# 生成が既定で有効
+
+### Step 3: 配布と切替（1週）
+- Velopack（Win インストーラ）/ dmg 生成、README 更新
+- Electron 版は1リリース分並行維持 → 問題なければ `src/main/` と electron 依存を削除
+- 完了条件: 両OS配布物で既存プロジェクトの開閉・編集・出力を確認
+
+### Step 4（任意・将来）: フルネイティブ化
+- 必要になった場合のみ、付録Aの v1 案（Avalonia + SkiaSharp）へ進む。
+  Step 2 で Core が完成しているため、v1 案の Phase 1 は消化済みの状態から始められる
+
+---
+
+## 8. リスクと対策
 
 | リスク | 影響 | 対策 |
 |---|---|---|
-| キャンバス操作感の再現不足（吸着・Group内選択など） | ユーザー体験の劣化 | events.js の挙動を §6.3 のように仕様書化してから実装。Electron版と並べて手動比較 |
-| テキストワープ・エフェクトの描画差 | 見た目の差異 | Phase 5 に隔離。SKPath ベースで再実装し、出力HTMLには影響しない（編集時表示のみ）ことを確認 |
-| フォント描画差（Canvas と Skia の行間・メトリクス） | テキスト折返し位置のズレ | 出力HTMLはブラウザが描画するため実害は編集画面のみ。許容差として文書化 |
-| Dock.Avalonia のレイアウト永続化仕様差 | パネル配置の使い勝手 | 初期レイアウトのみ再現し、細かい永続化は後回しにできる |
-| JS の緩い型（properties の揺れ） | 読み込み時の情報欠落 | `[JsonExtensionData]` で未知キーを必ず往復保存（§4） |
-| 2実装の並行期間の二重メンテ | 工数増 | Electron 版は Phase 1 完了後フィーチャーフリーズし、バグ修正のみ |
+| Mac の WKWebView と Chromium の描画・挙動差 | Mac版の操作感 | Step 0 で先行検証。Konva/GoldenLayout はSafari対応済み。許容不能なら Mac のみ Electron.NET 退避 |
+| Photino のネイティブメニュー対応不足 | メニューUX | 項目が少なく（4メニュー・約15項目）、Win32/NSMenu interop で再現可能。Step 0 で方式確定 |
+| WebView プロファイル移動によるオートセーブバックアップ消失 | 未保存データ | プロファイルディレクトリ固定 + 初回起動時に旧 localStorage からの移行は不要（バックアップは一時用途）だが挙動を文書化 |
+| JS↔C# メッセージの JSON 差異（数値丸め・エスケープ・null） | 保存/出力の劣化 | `UnsafeRelaxedJsonEscaping` + ラウンドトリップテスト（§6-3）で担保 |
+| 出力エンジン移植のミス | 生成HTMLの差異 | ゴールデンテストでバイト一致を必須化（§6-2）。一致まで JS 版を既定に維持 |
+| WebView2 ランタイム未導入の Windows 環境 | 起動不可 | Velopack のブートストラップで Evergreen WebView2 を自動導入 |
 
 ---
 
-## 10. 代替案（フル移行が重い場合）
+## 9. まとめ
 
-**Blazor Hybrid 段階移行案**: 出力エンジン（export/ 一式）とファイルI/Oだけを
-C#（= 本計画の Phase 0〜2 相当）に移し、キャンバス編集 UI は WebView 内で
-現行の Konva/JS コードを流用する構成です。
-
-- 利点: 難所の canvas/interaction 約1,800行を書き直さずに済み、1〜1.5ヶ月で C# 化の第一歩が出せる
-- 欠点: JS 資産が残り続け「C#への移行」としては不完全。JS⇄C# のブリッジ層が新たな複雑さになる
-- 位置づけ: 本計画の**保険**。Phase 3 で工数超過が見えた場合の退避先として温存する
+1. **UIは書き直さない。** 見た目・機能・操作感は renderer 約7,600行を無改変で動かすことで
+   「同一コードの実行」として保証する
+2. C# 化の対象は **Electron の殻（7つのブリッジAPI + メニュー + ファイルI/O）** と
+   **出力エンジン（純ロジック1,328行）** に限定する
+3. Step 1 完了時点（2〜3週）で Electron/Node 依存が消え、従来と同じ操作感のC#製アプリが成立。
+   Step 2 でロジックの本体も C# になり、総工数は約1.5〜2ヶ月
+4. フルネイティブ化は要件が変わった時のみ付録Aの計画で実施すればよい
 
 ---
 
-## 11. まとめ
+## 付録A: v1（フルネイティブ化案）の要約
 
-1. **中心はデータ（project.json）と出力エンジン**。ここを .NET 8 の `SiteBuilder.Core` として
-   先に移植し、ゴールデンテストでJS版とバイト一致を保証する（Phase 1）
-2. UI は **Avalonia 11 + Dock.Avalonia + SkiaSharp 自作キャンバス**で再構築し、
-   Win/Mac 両対応という現行の価値を維持する（Phase 2〜5）
-3. 既存ユーザーのプロジェクトファイルは**無変換でそのまま開ける**ことを互換性の絶対条件とする
-4. 総工数目安は専任1名で約4ヶ月。リスクが読めない場合は §10 の Blazor Hybrid 案へ切替可能
+将来 UI もネイティブ化したくなった場合の計画（初版の全文は本ファイルの Git 履歴を参照）。
+
+- **技術**: .NET 8 + Avalonia UI 11 + Dock.Avalonia + SkiaSharp 自作シーングラフ
+- **構成**: `SiteBuilder.Core`（本計画 Step 2 で完成済み）+ `SiteBuilder.App`（Avalonia UI）
+- **難所**: Konva 相当のキャンバス（選択・変形ハンドル・スナップ・Group内選択・Spaceパン・
+  PC/Mobile 2レイアウト）の再実装、テキストワープ、フォントメトリクス差
+- **データモデル**: project.json 互換 C# モデル（camelCase + `[JsonExtensionData]`。
+  `ProjectData` / `ProjectSettings` / `CanvasSettings` / `PageData` / `ElementData` /
+  `TransformData` / `ElementProperties` — 本計画 Step 2 と共通）
+- **工数目安**: Core 完成済み前提で追加 約2.5〜3.5ヶ月（専任1名）
+- **注意**: ネイティブ化した瞬間に「操作感の完全一致」は保証から近似に変わる。
+  実施判断は Electron/WebView 依存を排除すべき明確な理由が生じた時に限る
